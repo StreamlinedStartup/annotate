@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>annotate.js — plain HTML example</title>
+</head>
+<body>
+  <h1>Any static page</h1>
+  <p>
+    This is all it takes. The single script tag at the bottom of the page adds
+    the full review toolbar. Select this paragraph to highlight it, or press
+    <kbd>R</kbd> to draw a rectangle.
+  </p>
+
+  <!--
+    The whole installation: one script tag before </body>.
+    In production, point this at the CDN:
+
+      <script src="https://cdn.jsdelivr.net/npm/@annotatejs/core/annotate.js" defer></script>
+  -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/@annotatejs/core/annotate.js"
+    data-project="my-static-site"
+    data-accent="#0ea5e9"
+    defer
+  ></script>
+</body>
+</html>

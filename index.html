@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>annotate.js — live demo</title>
+  <style>
+    :root { --ink:#17171f; --muted:#6b6b76; --line:#e6e6ec; --accent:#6d28d9; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--ink); background: #fff;
+      font: 16px/1.65 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 140px; }
+    header { margin-bottom: 48px; }
+    .badge { display:inline-block; font-size:12px; font-weight:700; letter-spacing:.08em;
+      text-transform:uppercase; color:var(--accent); background:#f3e8ff; padding:5px 11px;
+      border-radius:99px; margin-bottom:18px; }
+    h1 { font-size: 44px; line-height:1.1; letter-spacing:-.02em; margin:0 0 14px; }
+    h2 { font-size: 26px; letter-spacing:-.01em; margin:48px 0 14px; }
+    h3 { font-size: 18px; margin:32px 0 8px; }
+    p { color:#33333d; margin:0 0 16px; }
+    .lead { font-size:20px; color:var(--muted); }
+    .hint { background:#faf8ff; border:1px solid #ece4ff; border-left:4px solid var(--accent);
+      border-radius:0 10px 10px 0; padding:14px 18px; margin:22px 0; }
+    figure { margin:28px 0; padding:28px; background:#f7f7fa; border:1px solid var(--line);
+      border-radius:16px; text-align:center; }
+    code { background:#f1f1f5; padding:2px 6px; border-radius:5px; font-size:.9em; }
+    pre { background:#17171f; color:#ededf2; padding:18px 20px; border-radius:12px;
+      overflow:auto; font-size:13.5px; }
+    blockquote { border-left:4px solid var(--line); margin:24px 0; padding:4px 0 4px 20px;
+      color:var(--muted); font-style:italic; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:24px 0; }
+    .card { border:1px solid var(--line); border-radius:14px; padding:20px; }
+    footer { margin-top:64px; padding-top:24px; border-top:1px solid var(--line);
+      color:var(--muted); font-size:14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="badge">Live demo</span>
+      <h1>Review anything, right on the page.</h1>
+      <p class="lead">
+        This is a real, working demo of <strong>annotate.js</strong>. Look at the
+        floating toolbar in the bottom-right corner — pick a tool and start
+        marking up this page.
+      </p>
+      <div class="hint">
+        <strong>Try it:</strong> select any sentence to highlight it, press
+        <code>R</code> to draw a rectangle, or hover a paragraph and click the
+        <strong>+</strong> button that appears in the margin. Open the comments
+        panel with <code>A</code>, then hit <strong>Download</strong> to export
+        your notes as JSON.
+      </div>
+    </header>
+
+    <h2>Why review on the live page?</h2>
+    <p>
+      Screenshots go stale, and describing "the third button under the hero" in
+      a chat thread is painful. annotate.js lets reviewers point at the exact
+      pixel and text they mean — highlights, boxes, pins and sketches all anchor
+      to real content, even as the page reflows.
+    </p>
+
+    <blockquote>
+      "Move this heading up, it competes with the logo." — a comment that only
+      makes sense when it's attached to the heading.
+    </blockquote>
+
+    <h2>Everything stays in your browser</h2>
+    <p>
+      There is no server here. Every comment you create on this page is saved in
+      your browser's <code>localStorage</code>. Refresh the page and your notes
+      are still there. When you're ready to share, export a small JSON file and
+      send it to a teammate — they import it and see your feedback in place.
+    </p>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Highlight text</h3>
+        <p>Select any words and a comment popover appears instantly.</p>
+      </div>
+      <div class="card">
+        <h3>Draw &amp; pin</h3>
+        <p>Rectangles, circles, freehand ink and point pins for visual notes.</p>
+      </div>
+      <div class="card">
+        <h3>Threaded replies</h3>
+        <p>Discuss each note, then resolve it when it's handled.</p>
+      </div>
+      <div class="card">
+        <h3>Download &amp; import</h3>
+        <p>Round-trip your review as a portable JSON file. No accounts.</p>
+      </div>
+    </div>
+
+    <h2>Add it to your own site</h2>
+    <p>One line, right before the closing <code>&lt;/body&gt;</code> tag:</p>
+    <pre>&lt;script src="https://cdn.jsdelivr.net/npm/@annotatejs/core/annotate.js" defer&gt;&lt;/script&gt;</pre>
+    <p>
+      That's the entire installation. See the
+      <a href="https://github.com/your-org/annotate.js#framework-integration">README</a>
+      for React, Vue, WordPress and more.
+    </p>
+
+    <figure>
+      A spacious figure block — try circling it (<code>C</code>) or dropping a
+      pin (<code>P</code>) on it.
+    </figure>
+
+    <footer>
+      annotate.js · MIT licensed · open source. This page itself uses the
+      locally-hosted <code>annotate.js</code> below.
+    </footer>
+  </div>
+
+  <!-- The library. When testing locally we load the sibling file directly. -->
+  <script
+    src="./annotate.js"
+    data-accent="#6d28d9"
+    data-project="annotate-demo"
+    defer
+  ></script>
+</body>
+</html>
