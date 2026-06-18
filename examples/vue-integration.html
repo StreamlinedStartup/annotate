@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>annotate.js — Vue 3 integration test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #f0fdf4; }
+    h1 { font-size: 2rem; margin-bottom: 1rem; color: #166534; }
+    p { color: #374151; line-height: 1.6; max-width: 42rem; }
+    .card { background: #fff; border: 1px solid #d1fae5; border-radius: 12px; padding: 1.5rem; margin-top: 1.5rem; max-width: 40rem; }
+    button { background: #16a34a; color: #fff; border: none; border-radius: 8px; padding: .6rem 1.2rem; cursor: pointer; font-size: .9rem; margin-right: .5rem; }
+    button:hover { background: #15803d; }
+    .count-display { font-size: 2rem; font-weight: 700; color: #16a34a; margin: .5rem 0; }
+    input { border: 1px solid #d1d5db; border-radius: 8px; padding: .5rem .8rem; font-size: .9rem; width: 100%; max-width: 20rem; margin-bottom: .5rem; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>Vue 3 Integration Test</h1>
+    <p>
+      This page is rendered by Vue 3. annotate.js should work as a drop-in
+      overlay without interfering with Vue reactivity or the virtual DOM.
+    </p>
+
+    <div class="card">
+      <h2>Reactive counter</h2>
+      <p>Vue's reactivity updates the DOM. Annotations must survive these updates.</p>
+      <div class="count-display">{{ count }}</div>
+      <button @click="count++">Increment</button>
+      <button @click="count = 0" style="background:#dc2626">Reset</button>
+    </div>
+
+    <div class="card">
+      <h2>Dynamic list</h2>
+      <input v-model="newItem" @keyup.enter="addItem" placeholder="Add a list item…" />
+      <button @click="addItem">Add</button>
+      <ul>
+        <li v-for="(item, i) in items" :key="i">{{ item }}</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Conditional content</h2>
+      <button @click="showExtra = !showExtra">Toggle section</button>
+      <div v-if="showExtra">
+        <p>This section conditionally renders. Annotate text here and then toggle it off and back on
+        to verify orphaned-comment handling.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script>
+    const { createApp, ref } = Vue;
+    createApp({
+      setup() {
+        const count = ref(0);
+        const newItem = ref('');
+        const showExtra = ref(false);
+        const items = ref(['Vue 3 Composition API', 'Works with v-if and v-for']);
+        function addItem() {
+          if (newItem.value.trim()) {
+            items.value.push(newItem.value.trim());
+            newItem.value = '';
+          }
+        }
+        return { count, newItem, showExtra, items, addItem };
+      }
+    }).mount('#app');
+  </script>
+
+  <script src="../annotate.js" data-project="vue-test" defer></script>
+</body>
+</html>

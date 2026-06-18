@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>annotate.js — React integration test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #fafafa; }
+    h1 { font-size: 2rem; margin-bottom: 1rem; }
+    p { color: #444; line-height: 1.6; max-width: 42rem; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; margin-top: 1.5rem; max-width: 40rem; }
+    button { background: #6d28d9; color: #fff; border: none; border-radius: 8px; padding: .6rem 1.2rem; cursor: pointer; font-size: .9rem; margin-right: .5rem; }
+    button:hover { background: #5b21b6; }
+    .counter { font-size: 1.5rem; font-weight: 700; color: #6d28d9; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React 18 via CDN (development build) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script>
+    const { useState, useEffect } = React;
+
+    function App() {
+      const [count, setCount] = useState(0);
+      const [items] = useState([
+        'Annotate any React component tree',
+        'Works with React Router and Next.js',
+        'No re-render interference — annotate.js is external to React',
+        'Annotations persist across React state changes',
+      ]);
+
+      return React.createElement('div', null,
+        React.createElement('h1', null, 'React Integration Test'),
+        React.createElement('p', null,
+          'This page renders via React 18. The annotate.js toolbar should appear bottom-right ' +
+          'and survive React re-renders and state changes without breaking.'
+        ),
+        React.createElement('div', { className: 'card' },
+          React.createElement('h2', null, 'Counter (React state)'),
+          React.createElement('p', { className: 'counter' }, count),
+          React.createElement('button', { onClick: () => setCount(c => c + 1) }, '+ Increment'),
+          React.createElement('button', { onClick: () => setCount(0), style: { background: '#dc2626' } }, 'Reset'),
+          React.createElement('p', null, 'Clicking these buttons triggers React re-renders. ' +
+            'Annotations should stay anchored.')
+        ),
+        React.createElement('div', { className: 'card' },
+          React.createElement('h2', null, 'Feature checklist'),
+          React.createElement('ul', null,
+            items.map((item, i) => React.createElement('li', { key: i }, item))
+          )
+        )
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+
+  <!-- annotate.js loaded AFTER React mounts -->
+  <script src="../annotate.js" data-project="react-test" defer></script>
+</body>
+</html>

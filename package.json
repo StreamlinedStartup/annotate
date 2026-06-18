@@ -11,8 +11,12 @@
     "LICENSE"
   ],
   "scripts": {
-    "start": "npx serve .",
-    "demo": "npx serve ."
+    "start": "npx serve . --listen 4200 --no-clipboard",
+    "demo": "npx serve . --listen 4200 --no-clipboard",
+    "test": "playwright test",
+    "test:chromium": "playwright test --project=chromium",
+    "test:mobile": "playwright test --project=mobile-chrome --project=mobile-safari",
+    "test:report": "playwright show-report"
   },
   "keywords": [
     "annotation",
@@ -34,5 +38,12 @@
   "homepage": "https://reviewjs.com",
   "bugs": {
     "url": "https://github.com/reviewjs/annotate/issues"
+  },
+  "directories": {
+    "example": "examples"
+  },
+  "author": "",
+  "devDependencies": {
+    "@playwright/test": "^1.61.0"
   }
 }

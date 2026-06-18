@@ -564,7 +564,7 @@
     display:flex; align-items:center; justify-content:center; }
 
   /* ---- hint pill + shortcuts card ----------------------------------------- */
-  body.an-drawing { cursor: crosshair !important; touch-action: none; }
+  body.an-drawing { cursor: crosshair !important; touch-action: none; user-select: none; -webkit-user-select: none; }
   body.an-drawing ::selection { background: transparent; }
   #__an_hint { position:fixed; top:14px; left:50%; transform:translateX(-50%);
     background:#1c1c24; color:#f2f2f6; font:500 13px var(--an-font); padding:8px 16px;
@@ -594,6 +594,19 @@
       right:0; left:0; bottom:0; width:auto; max-width:none;
       transform: translateY(110%); }
     #__an_panel.an-open { transform: translateY(0); }
+    #__an_compose { width: min(304px, calc(100vw - 16px)); }
+    .an-btn[data-tip]:hover::after { display:none; }
+    #__an_hint { font-size:11px; padding:7px 12px; }
+    #__an_bar { padding:6px; gap:4px; }
+    .an-btn { width:36px; height:36px; }
+    #__an_colorbtn { width:36px; height:36px; }
+    #__an_panel .an-list { -webkit-overflow-scrolling: touch; }
+    .an-ph { padding:14px 14px 10px; }
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    .an-btn[data-tip]:hover::after { display:none; }
+    .an-cact { opacity:1; }
   }
   `;
 
@@ -960,7 +973,8 @@
     composer.appendChild(ta);
     var save = el("button", { class: "an-primary", text: "Comment" });
     var cancel = el("button", { class: "an-ghost", text: "Cancel" });
-    var isMac = /Mac|iPhone|iPad/.test(navigator.platform || "");
+    var isMac = /Mac|iPhone|iPad/i.test(navigator.userAgentData ? "" : (navigator.platform || navigator.userAgent || "")) ||
+      (navigator.userAgentData && navigator.userAgentData.platform === "macOS");
     composer.appendChild(el("div", { class: "an-cfoot" }, [
       el("span", { class: "an-ckbd", text: (isMac ? "⌘" : "Ctrl") + "↵ to post" }),
       cancel, save,
@@ -978,9 +992,17 @@
       e.stopPropagation();
     });
 
-    var vw = window.innerWidth, vh = window.innerHeight, W = 304, H = 210;
-    var px = Math.min(Math.max(8, x), vw - W - 8);
-    var py = Math.min(Math.max(8, y), vh - H - 8);
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var W = Math.min(304, vw - 16), H = 210;
+    var mobile = vw <= 640;
+    var px, py;
+    if (mobile) {
+      px = 8;
+      py = Math.max(8, Math.min(y, vh * 0.45));
+    } else {
+      px = Math.min(Math.max(8, x), vw - W - 8);
+      py = Math.min(Math.max(8, y), vh - H - 8);
+    }
     composer.style.left = (px + window.scrollX) + "px";
     composer.style.top = (py + window.scrollY) + "px";
     composer.classList.add("an-show");
@@ -1050,9 +1072,11 @@
   // ==========================================================================
   // TOOL INTERACTIONS (pointer events — mouse, touch, stylus)
   // ==========================================================================
+  var justCancelledDraw = false;
   document.addEventListener("pointerup", function (e) {
     if (!state.enabled) return;
     if (drawing) return;
+    if (justCancelledDraw) { justCancelledDraw = false; return; }
     if (state.tool === "pin") return;
     if (composer && composer.classList.contains("an-show")) return;
     if (composer && composer.contains(e.target)) return;
@@ -1126,14 +1150,15 @@
     var d = drawing; drawing = null;
     if (d.node) overlay.removeChild(d.node);
     var box = d.box, geom;
+    function clearSel() { try { window.getSelection && window.getSelection().removeAllRanges(); } catch (ex) {} }
     if (d.tool === "pen") {
-      if (d.points.length < 2) return setTool("cursor");
+      if (d.points.length < 2) { clearSel(); justCancelledDraw = true; return setTool("cursor"); }
       geom = { kind: "pen", selector: cssPath(d.anchorEl),
         points: d.points.map(function (p) { return [(p[0] - box.x) / box.w, (p[1] - box.y) / box.h]; }) };
     } else {
       var x0 = Math.min(d.startX, e.pageX), y0 = Math.min(d.startY, e.pageY);
       var w = Math.abs(e.pageX - d.startX), h = Math.abs(e.pageY - d.startY);
-      if (w < 6 && h < 6) return setTool("cursor");
+      if (w < 6 && h < 6) { clearSel(); justCancelledDraw = true; return setTool("cursor"); }
       geom = { kind: d.tool === "circle" ? "circle" : "rect", selector: cssPath(d.anchorEl),
         x: (x0 - box.x) / box.w, y: (y0 - box.y) / box.h, w: w / box.w, h: h / box.h };
     }
@@ -1373,6 +1398,22 @@
         hidePlus();
       }
     });
+    // Touch: long-press any eligible block to reveal the + button
+    var touchHoldTimer = null, touchHoldTarget = null;
+    document.addEventListener("touchstart", function (e) {
+      if (!state.enabled) return;
+      if (state.tool !== "cursor" && state.tool !== "highlight") return;
+      touchHoldTarget = eligibleBlock(e.target);
+      if (!touchHoldTarget) return;
+      touchHoldTimer = setTimeout(function () {
+        if (!touchHoldTarget) return;
+        plusTarget = touchHoldTarget;
+        positionPlus(touchHoldTarget);
+        plusBtn.classList.add("an-show");
+      }, 500);
+    }, { passive: true });
+    document.addEventListener("touchend", function () { clearTimeout(touchHoldTimer); touchHoldTarget = null; }, { passive: true });
+    document.addEventListener("touchmove", function () { clearTimeout(touchHoldTimer); touchHoldTarget = null; }, { passive: true });
     window.addEventListener("scroll", function () { if (plusTarget) positionPlus(plusTarget); }, { passive: true });
   }
   function inKeepZone(x, y) {
@@ -1464,12 +1505,37 @@
     var root = document.getElementById("__an_root");
     if (root) root.classList.add("an-popen");
     renderPanel();
+    setupPanelSwipe();
   }
   function closePanel() {
     state.panelOpen = false;
     panel.classList.remove("an-open");
     var root = document.getElementById("__an_root");
     if (root) root.classList.remove("an-popen");
+  }
+
+  var panelSwipeSetup = false;
+  function setupPanelSwipe() {
+    if (panelSwipeSetup || !panel) return;
+    panelSwipeSetup = true;
+    var startY = 0, startScrollTop = 0, dragging = false;
+    panel.addEventListener("touchstart", function (e) {
+      if (window.innerWidth > 640) return;
+      startY = e.touches[0].clientY;
+      startScrollTop = listEl ? listEl.scrollTop : 0;
+      dragging = false;
+    }, { passive: true });
+    panel.addEventListener("touchmove", function (e) {
+      if (window.innerWidth > 640) return;
+      var dy = e.touches[0].clientY - startY;
+      if (dy > 0 && startScrollTop <= 0) { dragging = true; }
+    }, { passive: true });
+    panel.addEventListener("touchend", function (e) {
+      if (!dragging || window.innerWidth > 640) return;
+      var dy = e.changedTouches[0].clientY - startY;
+      if (dy > 80) closePanel();
+      dragging = false;
+    }, { passive: true });
   }
 
   function updateCount() {

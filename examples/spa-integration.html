@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>annotate.js — SPA navigation test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f8fafc; }
+    nav { background: #1e1b4b; padding: 1rem 2rem; display: flex; gap: 1.5rem; }
+    nav a { color: #c4b5fd; text-decoration: none; font-weight: 500; cursor: pointer; }
+    nav a:hover, nav a.active { color: #fff; }
+    main { padding: 2rem; max-width: 50rem; margin: 0 auto; }
+    h1 { color: #1e1b4b; }
+    p { color: #475569; line-height: 1.6; }
+    .page { display: none; }
+    .page.active { display: block; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a data-route="home" class="active" onclick="navigate('home', event)">Home</a>
+    <a data-route="about" onclick="navigate('about', event)">About</a>
+    <a data-route="pricing" onclick="navigate('pricing', event)">Pricing</a>
+    <a data-route="contact" onclick="navigate('contact', event)">Contact</a>
+  </nav>
+
+  <main>
+    <div id="home" class="page active">
+      <h1>Home page</h1>
+      <p>This simulates a single-page application navigating between routes via pushState.
+         annotate.js should remain active and the toolbar should stay visible across route changes.</p>
+      <p>Each route change updates <code>window.history</code> and re-calls
+         <code>Annotate.refresh()</code> to load per-page comments.</p>
+    </div>
+    <div id="about" class="page">
+      <h1>About page</h1>
+      <p>This is the "about" route. Select text here or draw a rectangle to leave a comment.
+         These comments should be kept separate from those on the Home page,
+         since annotate.js namespaces by page key.</p>
+    </div>
+    <div id="pricing" class="page">
+      <h1>Pricing page</h1>
+      <p>Pricing information would live here. This is a common page for UI feedback —
+         reviewers can highlight copy, box misaligned elements, and pin questions to specific figures.</p>
+    </div>
+    <div id="contact" class="page">
+      <h1>Contact page</h1>
+      <p>Contact form and details. Any review annotations left here are stored under the
+         <code>/contact</code> page key and do not mix with other pages.</p>
+    </div>
+  </main>
+
+  <script>
+    function navigate(route, e) {
+      if (e) e.preventDefault();
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+      document.getElementById(route).classList.add('active');
+      document.querySelector('[data-route="' + route + '"]').classList.add('active');
+      // simulate SPA pushState navigation
+      history.pushState({}, '', '/' + (route === 'home' ? '' : route));
+      // let annotate.js reload comments for the new "page"
+      if (window.Annotate) window.Annotate.refresh();
+    }
+  </script>
+
+  <script src="../annotate.js" data-project="spa-test" defer></script>
+</body>
+</html>
