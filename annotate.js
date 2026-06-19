@@ -16,6 +16,7 @@
  *   data-theme     "light" | "dark" | "auto"  (default auto — sniffs page bg)
  *   data-position  "bottom-right" | "bottom-left"  (toolbar corner)
  *   data-blocks    CSS selector for section-comment (+) targets
+ *   data-start-open "true" to show the toolbar on initial load
  *   data-note      author's note to reviewers — what should be reviewed
  *   data-share-email  where reviewers send comments: an email address, or a
  *                     Slack / Hangout (chat) link
@@ -51,6 +52,7 @@
     theme: scriptData.theme || globalConfig.theme || "auto",
     position: scriptData.position || globalConfig.position || "bottom-right",
     blocks: scriptData.blocks || globalConfig.blocks || "",
+    startOpen: truthy(scriptData.startOpen || globalConfig.startOpen),
     note: scriptData.note || globalConfig.note || "",
     share: String(scriptData.shareEmail || globalConfig.shareEmail || "").trim(),
   };
@@ -124,6 +126,9 @@
   function initials(name) {
     var p = String(name || "?").trim().split(/\s+/);
     return ((p[0] || "?")[0] + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase();
+  }
+  function truthy(v) {
+    return v === true || /^(1|true|yes|open)$/i.test(String(v || ""));
   }
   function nameHue(name) {
     var h = 0, s = String(name || "");
@@ -2109,9 +2114,9 @@
     // Start with the review bubble rather than the full
     // toolbar — and never prompt for a name on startup. The name is asked for
     // only when the reviewer actually clicks Review (see launchEl handler).
-    // A deep link (#an=<id>) is the one exception: open straight into review
-    // so the linked comment can be focused.
-    if (/^#an=./.test(location.hash)) setEnabled(true);
+    // A deep link (#an=<id>) and opt-in data-start-open embeds open straight
+    // into review mode. All other embeds start as the collapsed Review pill.
+    if (/^#an=./.test(location.hash) || CFG.startOpen) setEnabled(true);
     else setEnabled(false);
   }
 

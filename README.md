@@ -87,6 +87,7 @@ Configure with `data-` attributes on the script tag — all optional:
   data-accent="#6d28d9"
   data-theme="auto"
   data-position="bottom-right"
+  data-start-open="true"
   data-note="Focus on the hero copy and pricing — flag anything off-brand."
   data-share-email="reviews@example.com"
   defer
@@ -101,6 +102,7 @@ Configure with `data-` attributes on the script tag — all optional:
 | `data-theme` | `auto` | `light`, `dark`, or `auto` (sniffs your page background). |
 | `data-position` | `bottom-right` | `bottom-right` or `bottom-left`. |
 | `data-blocks` | sensible default | CSS selector for "section note" (+) targets. |
+| `data-start-open` | `false` | Set to `true` to show the review toolbar immediately instead of the collapsed Review pill. |
 | `data-note` | — | Author's note to reviewers — what should be reviewed. Shown when they start and atop the comments panel. |
 | `data-share-email` | — | Where reviewers send comments: an email address, or a Slack / Hangout link. Adds a **Share** button. |
 
