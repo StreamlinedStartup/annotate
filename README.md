@@ -87,6 +87,8 @@ Configure with `data-` attributes on the script tag — all optional:
   data-accent="#6d28d9"
   data-theme="auto"
   data-position="bottom-right"
+  data-note="Focus on the hero copy and pricing — flag anything off-brand."
+  data-share-email="reviews@example.com"
   defer
 ></script>
 ```
@@ -99,6 +101,8 @@ Configure with `data-` attributes on the script tag — all optional:
 | `data-theme` | `auto` | `light`, `dark`, or `auto` (sniffs your page background). |
 | `data-position` | `bottom-right` | `bottom-right` or `bottom-left`. |
 | `data-blocks` | sensible default | CSS selector for "section note" (+) targets. |
+| `data-note` | — | Author's note to reviewers — what should be reviewed. Shown when they start and atop the comments panel. |
+| `data-share-email` | — | Where reviewers send comments: an email address, or a Slack / Hangout link. Adds a **Share** button. |
 
 Prefer JS config? Set `window.AnnotateConfig` **before** the script loads:
 
@@ -108,6 +112,8 @@ Prefer JS config? Set `window.AnnotateConfig` **before** the script loads:
     project: "marketing-site",
     accent: "#6d28d9",
     theme: "auto",
+    note: "Focus on the hero copy and pricing — flag anything off-brand.",
+    shareEmail: "reviews@example.com",
   };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js" defer></script>
@@ -282,12 +288,12 @@ You can also drive this from code (see the API below).
 A global `window.Annotate` is available once the script loads:
 
 ```js
-Annotate.open();              // open the comments panel
+Annotate.open();              // show the review layer and open the comments panel
 Annotate.close();
 Annotate.toggle();
 Annotate.enable();            // show the review layer
 Annotate.disable();           // collapse to the launcher
-Annotate.setTool("highlight");// cursor | highlight | rect | circle | pen | pin
+Annotate.setTool("highlight");// show the layer, then choose cursor | highlight | rect | circle | pen | pin
 Annotate.comments();          // → array of comment objects for this page
 Annotate.focus(id);           // scroll to & highlight a comment
 Annotate.export();            // trigger the JSON download

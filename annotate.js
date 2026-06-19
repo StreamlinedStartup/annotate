@@ -16,6 +16,9 @@
  *   data-theme     "light" | "dark" | "auto"  (default auto — sniffs page bg)
  *   data-position  "bottom-right" | "bottom-left"  (toolbar corner)
  *   data-blocks    CSS selector for section-comment (+) targets
+ *   data-note      author's note to reviewers — what should be reviewed
+ *   data-share-email  where reviewers send comments: an email address, or a
+ *                     Slack / Hangout (chat) link
  * …or via `window.AnnotateConfig = { project, page, … }` before the script.
  *
  * Tools: text highlight, rectangle, circle, pin, freehand ink and section
@@ -48,6 +51,8 @@
     theme: scriptData.theme || globalConfig.theme || "auto",
     position: scriptData.position || globalConfig.position || "bottom-right",
     blocks: scriptData.blocks || globalConfig.blocks || "",
+    note: scriptData.note || globalConfig.note || "",
+    share: String(scriptData.shareEmail || globalConfig.shareEmail || "").trim(),
   };
   var PAGE = (CFG.project ? CFG.project + ":" : "") + CFG.page;
 
@@ -68,6 +73,10 @@
     tool: "cursor", // cursor | highlight | rect | circle | pin | pen
     color: store.get("an-color") || COLORS[0].hex,
     author: store.get("an-author") || "",
+    // note & share are set by the author via data-note / data-share-email on
+    // the embed script — they are static and never edited by the reviewer.
+    note: CFG.note || "",
+    share: CFG.share || "",
     comments: [],
     panelOpen: false,
     activeId: null,
@@ -255,7 +264,9 @@
   }
 
   #__an_root, #__an_root *, #__an_compose, #__an_compose *,
-  #__an_toasts, #__an_toasts *, #__an_namewrap, #__an_namewrap * { box-sizing: border-box; }
+  #__an_toasts, #__an_toasts *, #__an_namewrap, #__an_namewrap *,
+  #__an_sharewrap, #__an_sharewrap *, #__an_launch, #__an_launch *,
+  #__an_plus, #__an_plus * { box-sizing: border-box; }
 
   .an-mark { border-radius: 2px; padding: .04em 0; cursor: pointer;
     transition: background .15s, box-shadow .15s; }
@@ -493,7 +504,8 @@
   #__an_namebox { background: var(--an-surface); color: var(--an-fg);
     width:380px; max-width:92vw; border-radius:18px;
     padding:26px 26px 22px; box-shadow: var(--an-shadow-lg);
-    animation: an-pop .22s cubic-bezier(.34,1.56,.64,1); }
+    animation: an-pop .22s cubic-bezier(.34,1.56,.64,1);
+    max-height:calc(100vh - 32px); overflow-y:auto; }
   @keyframes an-pop { from{transform:scale(.92);opacity:0} to{transform:scale(1);opacity:1} }
   #__an_namebox .an-nt { font:700 19px/1.2 var(--an-font); letter-spacing:-.01em; margin:0 0 6px; }
   #__an_namebox .an-nd { font-size:13.5px; color: var(--an-muted); line-height:1.5; margin:0 0 18px; }
@@ -505,6 +517,68 @@
     border:none; border-radius:11px; padding:12px; font:600 14px var(--an-font);
     cursor:pointer; transition: filter .15s; }
   #__an_namebox button:hover { filter: brightness(1.15); }
+  #__an_namebox .an-nnote { background: var(--an-surface-2);
+    border:1px solid var(--an-border); border-radius:11px;
+    padding:11px 13px; margin:0 0 16px; font:13.5px/1.5 var(--an-font);
+    color: var(--an-fg); overflow-wrap:anywhere; }
+  #__an_namebox .an-nnote .an-nlbl { display:block; font-weight:700;
+    font-size:11px; letter-spacing:.04em; text-transform:uppercase;
+    color: var(--an-muted); margin-bottom:3px; }
+
+  /* ---- share dialog ------------------------------------------------------ */
+  #__an_sharewrap { position:fixed; inset:0; z-index:2147483400;
+    background:rgba(14,14,22,.45); backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center;
+    font-family: var(--an-font); }
+  #__an_sharebox { background: var(--an-surface); color: var(--an-fg);
+    width:440px; max-width:92vw; border-radius:18px; padding:24px 24px 18px;
+    box-shadow: var(--an-shadow-lg); animation: an-pop .22s cubic-bezier(.34,1.56,.64,1);
+    max-height:calc(100vh - 32px); overflow-y:auto; }
+  #__an_sharebox .an-st { font:700 19px/1.2 var(--an-font); letter-spacing:-.01em; margin:0 0 5px; }
+  #__an_sharebox .an-sd { font-size:13.5px; color: var(--an-muted); line-height:1.5; margin:0 0 16px; }
+  #__an_sharebox .an-sdest { display:flex; align-items:center; gap:8px;
+    background: var(--an-surface-2); border:1px solid var(--an-border);
+    border-radius:10px; padding:9px 12px; margin-bottom:18px; font-size:13px;
+    word-break:break-all; }
+  #__an_sharebox .an-sdest svg { width:15px; height:15px; flex:none; color: var(--an-muted); }
+  #__an_sharebox .an-sstep { display:flex; gap:11px; margin-bottom:16px; }
+  #__an_sharebox .an-snum { flex:none; width:22px; height:22px; border-radius:50%;
+    background: var(--an-btn-bg); color: var(--an-btn-fg); font:700 12px var(--an-font);
+    display:flex; align-items:center; justify-content:center; margin-top:1px; }
+  #__an_sharebox .an-stext { font-size:13.5px; line-height:1.5; overflow-wrap:anywhere; }
+  #__an_sharebox .an-stext b { font-weight:700; }
+  #__an_sharebox .an-srow { display:flex; gap:8px; flex-wrap:wrap; margin-top:9px; }
+  #__an_sharebox .an-sbtn { display:inline-flex; align-items:center; gap:6px;
+    background: var(--an-btn-bg); color: var(--an-btn-fg); border:none;
+    border-radius:9px; padding:8px 13px; font:600 13px var(--an-font);
+    cursor:pointer; transition: filter .15s; }
+  #__an_sharebox .an-sbtn.an-ghost2 { background: var(--an-surface-2);
+    color: var(--an-fg); border:1px solid var(--an-border-strong); }
+  #__an_sharebox .an-sbtn:hover { filter: brightness(1.12); }
+  #__an_sharebox .an-sbtn svg { width:14px; height:14px; }
+  #__an_sharebox .an-sclose { width:100%; margin-top:8px; background:none;
+    border:none; color: var(--an-muted); font:600 13px var(--an-font);
+    cursor:pointer; padding:9px; border-radius:9px; }
+  #__an_sharebox .an-sclose:hover { background: var(--an-surface-2); color: var(--an-fg); }
+
+  /* ---- author note banner inside panel ----------------------------------- */
+  #__an_note { display:none; gap:9px; align-items:flex-start;
+    margin:0 16px 10px; padding:10px 12px; border-radius:11px;
+    background: var(--an-surface-2); border:1px solid var(--an-border);
+    font:13px/1.45 var(--an-font); color: var(--an-fg);
+    overflow-wrap:anywhere; }
+  #__an_note.an-show { display:flex; }
+  #__an_note svg { width:15px; height:15px; flex:none; color: var(--an-muted); margin-top:1px; }
+  #__an_note .an-nlbl { font-weight:700; }
+
+  /* ---- pulsating download cue -------------------------------------------- */
+  @keyframes an-pulse {
+    0%   { box-shadow:0 0 0 0 rgba(245,158,11,.55); }
+    70%  { box-shadow:0 0 0 8px rgba(245,158,11,0); }
+    100% { box-shadow:0 0 0 0 rgba(245,158,11,0); }
+  }
+  .an-pulse { animation: an-pulse 1.8s ease-out infinite;
+    border-color:#f59e0b !important; color:#f59e0b !important; }
 
   /* ---- toasts ------------------------------------------------------------ */
   #__an_toasts { position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
@@ -548,7 +622,7 @@
   .an-block-tab svg { width:13px; height:13px; }
 
   /* ---- off-mode launcher -------------------------------------------------- */
-  #__an_launch { position:fixed; bottom:18px; z-index:2147483200;
+  #__an_launch { position:fixed; bottom:24px; z-index:2147483200;
     display:none; align-items:center; gap:8px; background: var(--an-btn-bg);
     color: var(--an-btn-fg); border:none; border-radius:24px;
     padding:10px 16px 10px 13px; cursor:pointer;
@@ -594,6 +668,7 @@
       right:0; left:0; bottom:0; width:auto; max-width:none;
       transform: translateY(110%); }
     #__an_panel.an-open { transform: translateY(0); }
+    #__an_root.an-popen #__an_bar { display:none; }
     #__an_compose { width: min(304px, calc(100vw - 16px)); }
     .an-btn[data-tip]:hover::after { display:none; }
     #__an_hint { font-size:11px; padding:7px 12px; }
@@ -607,6 +682,11 @@
   @media (hover: none) and (pointer: coarse) {
     .an-btn[data-tip]:hover::after { display:none; }
     .an-cact { opacity:1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #__an_bar, #__an_panel, #__an_compose, #__an_namebox, #__an_sharebox,
+    .an-toast, .an-pin { animation:none !important; transition:none !important; }
+    .an-pulse { animation:none !important; }
   }
   `;
 
@@ -633,6 +713,9 @@
     info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>',
     download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>',
     upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9M7 13l5-5 5 5"/><path d="M5 3h14"/></svg>',
+    share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><path d="M3 6l9 6 9-6"/></svg>',
   };
 
   // ==========================================================================
@@ -1013,17 +1096,27 @@
     var wrap = el("div", { id: "__an_namewrap" });
     var input = el("input", { placeholder: "e.g. Jane Doe", value: state.author || "" });
     var btn = el("button", { text: "Start reviewing" });
-    var box = el("div", { id: "__an_namebox" }, [
-      el("h3", { class: "an-nt", text: "Welcome, reviewer" }),
+    var kids = [
+      el("h3", { class: "an-nt", text: "Please provide your name" }),
       el("p", { class: "an-nd", text: "Your name appears on every comment so collaborators know who said what. Saved on this device — you won't be asked again." }),
-      input, btn,
-    ]);
+    ];
+    // Surface the author's note (data-note) up front so the reviewer knows
+    // what to focus on before they start.
+    if (state.note) {
+      kids.push(el("div", { class: "an-nnote" }, [
+        el("span", { class: "an-nlbl", text: "What to review" }),
+        el("span", { text: state.note }),
+      ]));
+    }
+    kids.push(input, btn);
+    var box = el("div", { id: "__an_namebox" }, kids);
     wrap.appendChild(box);
     document.body.appendChild(wrap);
     function done() {
       state.author = input.value.trim() || "Anonymous";
       store.set("an-author", state.author);
       wrap.remove();
+      renderNote();
       if (onDone) onDone();
     }
     btn.addEventListener("click", done);
@@ -1138,12 +1231,17 @@
         ry: Math.abs(e.pageY - d.startY) / 2, fill: hexA(state.color, 0.07),
         stroke: state.color, "stroke-width": 2.5 });
     } else if (d.tool === "pen") {
-      d.points.push([e.pageX, e.pageY]);
+      addPenPoint(d, e.pageX, e.pageY);
       var dd = d.points.map(function (p, i) { return (i ? "L" : "M") + p[0] + " " + p[1]; }).join(" ");
       d.node = svgEl("path", { d: dd, fill: "none", stroke: state.color,
         "stroke-width": 3, "stroke-linecap": "round", "stroke-linejoin": "round" });
     }
     overlay.appendChild(d.node);
+  }
+  function addPenPoint(d, x, y) {
+    var last = d.points[d.points.length - 1];
+    if (!last || Math.abs(last[0] - x) > 0.5 || Math.abs(last[1] - y) > 0.5)
+      d.points.push([x, y]);
   }
   function onUp(e) {
     if (!drawing) return;
@@ -1152,7 +1250,11 @@
     var box = d.box, geom;
     function clearSel() { try { window.getSelection && window.getSelection().removeAllRanges(); } catch (ex) {} }
     if (d.tool === "pen") {
-      if (d.points.length < 2) { clearSel(); justCancelledDraw = true; return setTool("cursor"); }
+      addPenPoint(d, e.pageX, e.pageY);
+      var dx = e.pageX - d.startX, dy = e.pageY - d.startY;
+      if (d.points.length < 2 || Math.sqrt(dx * dx + dy * dy) < 6) {
+        clearSel(); justCancelledDraw = true; return setTool("cursor");
+      }
       geom = { kind: "pen", selector: cssPath(d.anchorEl),
         points: d.points.map(function (p) { return [(p[0] - box.x) / box.w, (p[1] - box.y) / box.h]; }) };
     } else {
@@ -1184,7 +1286,7 @@
   // ==========================================================================
   // TOOLBAR + PANEL UI
   // ==========================================================================
-  var bar, panel, listEl, footEl, countBadge, hintEl, launchEl, helpEl;
+  var bar, panel, listEl, footEl, countBadge, hintEl, launchEl, helpEl, noteEl;
   var SIDE = CFG.position === "bottom-left" ? "an-left" : "an-right";
   function buildUI() {
     var style = el("style", { html: CSS_TEXT });
@@ -1200,18 +1302,22 @@
 
     bar = el("div", { id: "__an_bar", class: SIDE });
     var tools = [
-      ["cursor", "Browse  ·  V"], ["highlight", "Highlight text  ·  H"],
-      ["rect", "Rectangle  ·  R"], ["circle", "Circle  ·  C"],
-      ["pen", "Freehand  ·  D"], ["pin", "Pin  ·  P"],
+      ["cursor", "Browse", "V"], ["highlight", "Highlight text", "H"],
+      ["rect", "Rectangle", "R"], ["circle", "Circle", "C"],
+      ["pen", "Freehand", "D"], ["pin", "Pin", "P"],
     ];
     tools.forEach(function (t) {
-      var b = el("button", { class: "an-btn", "data-tool": t[0], "data-tip": t[1], html: ICONS[t[0]] });
+      var tip = t[1] + "  ·  " + t[2];
+      var b = el("button", {
+        class: "an-btn", "data-tool": t[0], "data-tip": tip,
+        title: tip, "aria-label": t[1], html: ICONS[t[0]]
+      });
       b.addEventListener("click", function () { setTool(t[0]); });
       bar.appendChild(b);
     });
     bar.appendChild(el("div", { class: "an-sep" }));
 
-    var colorBtn = el("button", { id: "__an_colorbtn", "data-tip": "Color" });
+    var colorBtn = el("button", { id: "__an_colorbtn", "data-tip": "Color", title: "Color", "aria-label": "Color" });
     var colorDot = el("span", { class: "an-swdot" });
     colorDot.style.background = state.color;
     colorBtn.appendChild(colorDot);
@@ -1235,19 +1341,22 @@
     bar.appendChild(colorBtn);
     bar.appendChild(el("div", { class: "an-sep" }));
 
-    var listBtn = el("button", { class: "an-btn", "data-tip": "Comments  ·  A", html: ICONS.list });
+    var listBtn = el("button", { class: "an-btn", "data-tip": "Comments  ·  A", title: "Comments  ·  A", "aria-label": "Comments", html: ICONS.list });
     countBadge = el("span", { class: "an-count" }); countBadge.style.display = "none";
     listBtn.appendChild(countBadge);
     listBtn.addEventListener("click", togglePanel);
     bar.appendChild(listBtn);
 
-    var offBtn = el("button", { class: "an-btn", "data-tip": "Hide review tools  ·  O", html: ICONS.hide });
+    var offBtn = el("button", { class: "an-btn", "data-tip": "Hide review tools  ·  O", title: "Hide review tools  ·  O", "aria-label": "Hide review tools", html: ICONS.hide });
     offBtn.addEventListener("click", function () { setEnabled(false); });
     bar.appendChild(offBtn);
     root.appendChild(bar);
 
     launchEl = el("button", { id: "__an_launch", class: SIDE, html: ICONS.bubble + "<span>Review</span>" });
-    launchEl.addEventListener("click", function () { setEnabled(true); });
+    launchEl.addEventListener("click", function () {
+      if (!state.author) askName(function () { setEnabled(true); });
+      else setEnabled(true);
+    });
     document.body.appendChild(launchEl);
 
     hintEl = el("div", { id: "__an_hint" });
@@ -1269,9 +1378,9 @@
     var header = el("div", { class: "an-ph" }, [
       el("h2", { text: "Comments" }),
       el("span", { class: "an-pcount", id: "__an_sub", text: "0" }),
-      el("button", { class: "an-hbtn", html: ICONS.upload, title: "Import comments from a JSON file", onclick: function (e) { e.stopPropagation(); pickImportFile(); } }),
-      el("button", { class: "an-hbtn", html: ICONS.download, title: "Download comments as JSON", onclick: function (e) { e.stopPropagation(); exportComments(); } }),
-      el("button", { class: "an-x", html: "&times;", onclick: closePanel }),
+      el("button", { class: "an-hbtn", html: ICONS.upload, title: "Import comments from a JSON file", "aria-label": "Import comments from a JSON file", onclick: function (e) { e.stopPropagation(); pickImportFile(); } }),
+      el("button", { class: "an-hbtn", html: ICONS.download, title: "Download comments as JSON", "aria-label": "Download comments as JSON", onclick: function (e) { e.stopPropagation(); exportComments(); } }),
+      el("button", { class: "an-x", html: "&times;", "aria-label": "Close comments panel", onclick: closePanel }),
     ]);
     var search = el("div", { class: "an-search" }, [
       (function () { var s = el("span", { html: ICONS.search }); return s.firstChild; })(),
@@ -1295,10 +1404,12 @@
       filters.appendChild(ch);
     });
     var toolsRow = el("div", { class: "an-toolsrow" }, [search, filters]);
+    noteEl = el("div", { id: "__an_note" });
     listEl = el("div", { class: "an-list", id: "__an_list" });
     footEl = el("div", { id: "__an_foot" });
     panel.appendChild(header);
     panel.appendChild(toolsRow);
+    panel.appendChild(noteEl);
     panel.appendChild(listEl);
     panel.appendChild(footEl);
     root.appendChild(panel);
@@ -1504,6 +1615,7 @@
     panel.classList.add("an-open");
     var root = document.getElementById("__an_root");
     if (root) root.classList.add("an-popen");
+    renderNote();
     renderPanel();
     setupPanelSwipe();
   }
@@ -1779,17 +1891,160 @@
     });
   }
 
+  function renderNote() {
+    if (!noteEl) return;
+    if (state.note) {
+      noteEl.innerHTML = "";
+      noteEl.appendChild(el("span", { html: ICONS.info }).firstChild);
+      noteEl.appendChild(el("span", {}, [
+        el("span", { class: "an-nlbl", text: "What to review: " }),
+        document.createTextNode(state.note),
+      ]));
+      noteEl.classList.add("an-show");
+    } else {
+      noteEl.classList.remove("an-show");
+    }
+  }
+
   function renderFooter() {
     if (!footEl) return;
+    var n = state.comments.length;
+    var canShare = !!(state.share && state.share.trim());
     footEl.innerHTML = "";
     footEl.appendChild(el("div", { class: "an-localnote" }, [
       el("span", { html: ICONS.info }),
-      el("span", { text: "Saved in this browser. Download to share." }),
+      el("span", { text: canShare
+        ? "Saved in this browser. Download or share to send your comments."
+        : "Saved in this browser. Download to send your comments." }),
     ]));
     footEl.appendChild(el("div", { class: "an-footrow" }, [
-      el("button", { class: "an-fbtn", html: ICONS.download + "<span>Download</span>", onclick: exportComments }),
+      el("button", { class: "an-fbtn" + (n ? " an-pulse" : ""), title: "Download comments as JSON", html: ICONS.download + "<span>Download</span>", onclick: exportComments }),
+      canShare ? el("button", { class: "an-fbtn", title: "Send comments to " + state.share, html: ICONS.share + "<span>Share</span>", onclick: shareComments }) : null,
       el("button", { class: "an-fbtn", html: ICONS.upload + "<span>Import</span>", onclick: pickImportFile }),
     ]));
+  }
+
+  // Copy text to the clipboard with graceful fallback + toast feedback.
+  function copyText(text, okMsg) {
+    function ok() { toast(okMsg || "Copied to clipboard", { kind: "success" }); }
+    function fail() { window.prompt("Copy this:", text); }
+    if (navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(text).then(ok, fail);
+    else fail();
+  }
+  function clipText(text, max) {
+    var s = String(text || "").replace(/\s+/g, " ").trim();
+    return s.length > max ? s.slice(0, max - 1) + "…" : s;
+  }
+  function safeHttpUrl(url) {
+    try {
+      var u = new URL(url);
+      return /^https?:$/.test(u.protocol) ? u.href : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  // Build the plain-text review summary used in emails / chat messages.
+  function shareSummary(comments) {
+    var visible = comments.slice(0, 25);
+    var lines = visible.map(function (c, i) {
+      var who = c.author || "Anonymous";
+      var what = clipText(c.text, 280) || "(no text)";
+      return (i + 1) + ". [" + (TYPE_LABEL[c.type] || c.type) + "] " + who + ": " + what;
+    }).join("\n");
+    if (comments.length > visible.length)
+      lines += "\n… and " + (comments.length - visible.length) + " more comment" + (comments.length - visible.length === 1 ? "" : "s") + " in the JSON file.";
+    return {
+      subject: "Review comments — " + (CFG.project || PAGE),
+      body: "Review of " + location.href + "\n\n" + lines +
+        "\n\n(" + comments.length + " comment" + (comments.length === 1 ? "" : "s") +
+        ". The full JSON file keeps positions & replies — attach it.)",
+    };
+  }
+
+  function closeShareDialog() {
+    var w = document.getElementById("__an_sharewrap");
+    if (w) w.remove();
+  }
+
+  // Show a guided dialog rather than blindly firing a mailto: that may not
+  // resolve to a mail client. Walks the reviewer through the exact steps.
+  function shareComments() {
+    var comments = state.comments.slice();
+    if (!comments.length) { toast("No comments to share yet", { kind: "info" }); return; }
+    var dest = (state.share || "").trim();
+    if (!dest) {
+      toast("No share destination set by the author — use Download instead", { kind: "info" });
+      return;
+    }
+    if (document.getElementById("__an_sharewrap")) return;
+
+    var isEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(dest);
+    var sum = shareSummary(comments);
+    var fileSlug = (PAGE || "page").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "page";
+
+    function step(num, textNode, buttons) {
+      return el("div", { class: "an-sstep" }, [
+        el("div", { class: "an-snum", text: String(num) }),
+        el("div", { class: "an-stext" }, [textNode, el("div", { class: "an-srow" }, buttons)]),
+      ]);
+    }
+    function btn(label, icon, ghost, onclick) {
+      return el("button", { class: "an-sbtn" + (ghost ? " an-ghost2" : ""), html: icon + "<span>" + esc(label) + "</span>", onclick: onclick });
+    }
+
+    var dlButton = btn("Download JSON", ICONS.download, false, function () { exportComments(); });
+
+    var step2;
+    if (isEmail) {
+      step2 = step(2, el("span", {}, [
+        document.createTextNode("Email the comments to "),
+        el("b", { text: dest }),
+        document.createTextNode(". Open your mail app below (or copy the details), then "),
+        el("b", { text: "attach the file from step 1" }),
+        document.createTextNode("."),
+      ]), [
+        btn("Open email", ICONS.mail, false, function () {
+          window.location.href = "mailto:" + encodeURIComponent(dest) +
+            "?subject=" + encodeURIComponent(sum.subject) +
+            "&body=" + encodeURIComponent(sum.body);
+        }),
+        btn("Copy address", ICONS.copy, true, function () { copyText(dest, "Email address copied"); }),
+        btn("Copy summary", ICONS.copy, true, function () { copyText(sum.subject + "\n\n" + sum.body, "Summary copied"); }),
+      ]);
+    } else {
+      var channelUrl = safeHttpUrl(dest);
+      step2 = step(2, el("span", {}, [
+        document.createTextNode("Post the comments to your channel. Open it below, paste the copied summary, and "),
+        el("b", { text: "attach the file from step 1" }),
+        document.createTextNode("."),
+      ]), [
+        channelUrl ? btn("Open channel", ICONS.share, false, function () { window.open(channelUrl, "_blank", "noopener"); }) : null,
+        channelUrl ? null : btn("Copy destination", ICONS.copy, true, function () { copyText(dest, "Destination copied"); }),
+        btn("Copy summary", ICONS.copy, true, function () { copyText(sum.subject + "\n\n" + sum.body, "Summary copied"); }),
+      ]);
+    }
+
+    var box = el("div", { id: "__an_sharebox" }, [
+      el("h3", { class: "an-st", text: "Share your review" }),
+      el("p", { class: "an-sd", text: "Comments live only in this browser. Send them in two steps — they’re not uploaded anywhere automatically." }),
+      el("div", { class: "an-sdest" }, [
+        el("span", { html: isEmail ? ICONS.mail : ICONS.share }).firstChild,
+        el("span", {}, [el("b", { text: isEmail ? "Email to: " : "Channel: " }), document.createTextNode(dest)]),
+      ]),
+      step(1, el("span", {}, [
+        document.createTextNode("Download the comments file "),
+        el("b", { text: "(annotate-" + fileSlug + "-….json)" }),
+        document.createTextNode("."),
+      ]), [dlButton]),
+      step2,
+      el("button", { class: "an-sclose", text: "Done", onclick: closeShareDialog }),
+    ]);
+
+    var wrap = el("div", { id: "__an_sharewrap" }, [box]);
+    wrap.addEventListener("click", function (e) { if (e.target === wrap) closeShareDialog(); });
+    document.body.appendChild(wrap);
   }
 
   function mergeComment(updated) {
@@ -1851,20 +2106,32 @@
     setTool("cursor");
     renderFooter();
     load();
-    if (!state.enabled) setEnabled(false);
-    else if (!state.author) askName();
+    // Start with the review bubble rather than the full
+    // toolbar — and never prompt for a name on startup. The name is asked for
+    // only when the reviewer actually clicks Review (see launchEl handler).
+    // A deep link (#an=<id>) is the one exception: open straight into review
+    // so the linked comment can be focused.
+    if (/^#an=./.test(location.hash)) setEnabled(true);
+    else setEnabled(false);
+  }
+
+  function ensureEnabled() {
+    if (!state.enabled) setEnabled(true);
   }
 
   // public API — lets host pages and other scripts compose with the layer
   window.Annotate = {
     version: VERSION,
     config: CFG,
-    open: function () { openPanel(); },
+    open: function () { ensureEnabled(); openPanel(); },
     close: function () { closePanel(); },
-    toggle: function () { togglePanel(); },
+    toggle: function () {
+      if (!state.enabled) { setEnabled(true); openPanel(); }
+      else togglePanel();
+    },
     enable: function () { setEnabled(true); },
     disable: function () { setEnabled(false); },
-    setTool: function (t) { setTool(t); },
+    setTool: function (t) { ensureEnabled(); setTool(t); },
     refresh: function () { load(); },
     comments: function () { return state.comments.slice(); },
     focus: function (id) { focusComment(id, false); },

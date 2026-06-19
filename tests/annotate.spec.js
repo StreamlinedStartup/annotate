@@ -1,11 +1,17 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
 
-// Helper: dismiss the "Welcome, reviewer" name modal
+// Helper: enter review mode and dismiss the "Please provide your name" modal.
+// Startup now shows the review bubble; clicking it opens the name modal the
+// first time (when no name is stored yet).
 async function setName(page, name = 'Test User') {
+  const launch = page.locator('#__an_launch');
+  if (await launch.isVisible()) {
+    await launch.click();
+  }
   const modal = page.locator('#__an_namewrap');
   if (await modal.isVisible()) {
-    await modal.locator('input').fill(name);
+    await modal.locator('input').first().fill(name);
     await modal.locator('button').click();
     await expect(modal).not.toBeVisible();
   }
@@ -18,7 +24,48 @@ async function clearStorage(page) {
     localStorage.removeItem('an-author');
     localStorage.removeItem('an-off');
     localStorage.removeItem('an-color');
+    localStorage.removeItem('an-note');
+    localStorage.removeItem('an-share');
   });
+}
+
+async function expectPanelInViewport(page) {
+  await page.waitForFunction(() => {
+    const panel = document.querySelector('#__an_panel');
+    if (!panel) return false;
+    const box = panel.getBoundingClientRect();
+    return box.left >= 0 && box.right <= window.innerWidth && box.width > 300;
+  });
+}
+
+async function dispatchPointerStroke(page, startX, startY, endX, endY, steps = 18) {
+  await page.evaluate(({ startX, startY, endX, endY, steps }) => {
+    const EventCtor = window.PointerEvent || window.MouseEvent;
+    const target = document.elementFromPoint(startX, startY) || document.body;
+    function fire(type, x, y, buttons) {
+      target.dispatchEvent(new EventCtor(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        pointerType: 'mouse',
+        isPrimary: true,
+        button: 0,
+        buttons,
+        clientX: x,
+        clientY: y,
+      }));
+    }
+    fire('pointerdown', startX, startY, 1);
+    for (let i = 1; i <= steps; i++) {
+      fire(
+        'pointermove',
+        startX + i * ((endX - startX) / steps),
+        startY + i * ((endY - startY) / steps),
+        1
+      );
+    }
+    fire('pointerup', endX, endY, 0);
+  }, { startX, startY, endX, endY, steps });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -38,6 +85,13 @@ test.describe('Toolbar', () => {
     for (const tool of ['cursor', 'highlight', 'rect', 'circle', 'pen', 'pin']) {
       await expect(bar.locator(`[data-tool="${tool}"]`)).toBeVisible();
     }
+  });
+
+  test('tool buttons expose accessible names', async ({ page }) => {
+    await expect(page.locator('[data-tool="cursor"]')).toHaveAttribute('aria-label', 'Browse');
+    await expect(page.locator('[data-tool="highlight"]')).toHaveAttribute('aria-label', 'Highlight text');
+    await expect(page.locator('[data-tool="pin"]')).toHaveAttribute('aria-label', 'Pin');
+    await expect(page.locator('#__an_colorbtn')).toHaveAttribute('aria-label', 'Color');
   });
 
   test('cursor tool is active by default', async ({ page }) => {
@@ -224,10 +278,7 @@ test.describe('Rectangle drawing', () => {
     const section = page.locator('header.hero');
     const box = await section.boundingBox();
 
-    await page.mouse.move(box.x + 50, box.y + 60);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 200, box.y + 130);
-    await page.mouse.up();
+    await dispatchPointerStroke(page, box.x + 50, box.y + 60, box.x + 200, box.y + 130);
 
     const composer = page.locator('#__an_compose');
     await expect(composer).toHaveClass(/an-show/);
@@ -245,10 +296,7 @@ test.describe('Rectangle drawing', () => {
     const section = page.locator('header.hero');
     const box = await section.boundingBox();
 
-    await page.mouse.move(box.x + 50, box.y + 60);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 52, box.y + 62);
-    await page.mouse.up();
+    await dispatchPointerStroke(page, box.x + 50, box.y + 60, box.x + 52, box.y + 62, 2);
 
     // Wait a tick for any async handlers, then check no composer is visible
     await page.waitForTimeout(200);
@@ -263,15 +311,13 @@ test.describe('Rectangle drawing', () => {
 test.describe('Freehand pen', () => {
   test('drawing a stroke creates a pen annotation', async ({ page }) => {
     await page.keyboard.press('d');
+    await expect(page.locator('[data-tool="pen"]')).toHaveClass(/an-on/);
     const hero = page.locator('header.hero');
     const box = await hero.boundingBox();
+    const startX = box.x + box.width / 2 - 160;
+    const startY = box.y + 360;
 
-    await page.mouse.move(box.x + 40, box.y + 40);
-    await page.mouse.down();
-    for (let i = 1; i <= 10; i++) {
-      await page.mouse.move(box.x + 40 + i * 12, box.y + 40 + Math.sin(i) * 20);
-    }
-    await page.mouse.up();
+    await dispatchPointerStroke(page, startX, startY, startX + 150, startY + 42);
 
     await expect(page.locator('#__an_compose')).toHaveClass(/an-show/);
     await page.locator('#__an_compose textarea').fill('Freehand note');
@@ -454,6 +500,7 @@ test.describe('Public API (window.Annotate)', () => {
   test('open() / close() control the panel', async ({ page }) => {
     await page.evaluate(() => window.Annotate.open());
     await expect(page.locator('#__an_panel')).toHaveClass(/an-open/);
+    await expectPanelInViewport(page);
     await page.evaluate(() => window.Annotate.close());
     await expect(page.locator('#__an_panel')).not.toHaveClass(/an-open/);
   });
@@ -501,6 +548,13 @@ test.describe('Mobile viewport', () => {
     const transform = await panel.evaluate(el => getComputedStyle(el).transform);
     // translateY(0) resolves to identity matrix or "matrix(1, 0, 0, 1, 0, 0)"
     expect(transform).not.toContain('110');
+  });
+
+  test('toolbar does not cover the open mobile panel', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.keyboard.press('a');
+    await expect(page.locator('#__an_panel')).toHaveClass(/an-open/);
+    await expect(page.locator('#__an_bar')).not.toBeVisible();
   });
 
   test('toolbar buttons are large enough for touch (≥36px)', async ({ page }) => {
@@ -559,17 +613,24 @@ test.describe('Framework integration pages', () => {
   test('React integration page loads', async ({ page }) => {
     await page.goto('/examples/react-integration.html');
     await expect(page.locator('#root')).toBeVisible();
+    // Startup shows the review bubble; entering review reveals the toolbar.
+    await expect(page.locator('#__an_launch')).toBeVisible();
+    await setName(page);
     await expect(page.locator('#__an_bar')).toBeVisible();
   });
 
   test('Vue integration page loads', async ({ page }) => {
     await page.goto('/examples/vue-integration.html');
     await expect(page.locator('#app')).toBeVisible();
+    await expect(page.locator('#__an_launch')).toBeVisible();
+    await setName(page);
     await expect(page.locator('#__an_bar')).toBeVisible();
   });
 
   test('SPA navigation keeps toolbar', async ({ page }) => {
     await page.goto('/examples/spa-integration.html');
+    await expect(page.locator('#__an_launch')).toBeVisible();
+    await setName(page);
     await expect(page.locator('#__an_bar')).toBeVisible();
     // Navigate within SPA
     await page.locator('a[data-route]').first().click();
@@ -607,5 +668,118 @@ test.describe('Deep linking', () => {
     await setName(page, 'Linker');
     await expect(page.locator('#__an_panel')).toHaveClass(/an-open/, { timeout: 5000 });
     await expect(page.locator('.an-card.an-active')).toHaveCount(1);
+  });
+});
+
+// ============================================================
+// STARTUP BUBBLE + AUTHOR CONFIG (data-note / data-share)
+// ============================================================
+test.describe('Startup bubble & author config', () => {
+  // Start from a clean, name-less state so the bubble (not the toolbar) shows.
+  test.beforeEach(async ({ page }) => {
+    await clearStorage(page);
+    await page.reload();
+  });
+
+  test('startup shows the review bubble, not the toolbar', async ({ page }) => {
+    await expect(page.locator('#__an_launch')).toBeVisible();
+    await expect(page.locator('#__an_bar')).not.toBeVisible();
+  });
+
+  test('public open() expands collapsed startup and shows the panel', async ({ page }) => {
+    await page.evaluate(() => window.Annotate.open());
+    if (page.viewportSize().width <= 640) {
+      await expect(page.locator('#__an_bar')).not.toBeVisible();
+    } else {
+      await expect(page.locator('#__an_bar')).toBeVisible();
+    }
+    await expect(page.locator('#__an_panel')).toHaveClass(/an-open/);
+    await expectPanelInViewport(page);
+  });
+
+  test('review bubble sits in the bottom-right corner', async ({ page }) => {
+    const launch = page.locator('#__an_launch');
+    await expect(launch).toBeVisible();
+    const box = await launch.boundingBox();
+    const vp = page.viewportSize();
+    // right edge near the right side of the viewport
+    expect(vp.width - (box.x + box.width)).toBeLessThanOrEqual(40);
+    // bottom edge near the bottom of the viewport
+    expect(vp.height - (box.y + box.height)).toBeLessThanOrEqual(40);
+    // and clearly in the lower portion of the screen
+    expect(box.y).toBeGreaterThan(vp.height * 0.6);
+  });
+
+  test('bubble stays bottom-right after scrolling (fixed)', async ({ page }) => {
+    const launch = page.locator('#__an_launch');
+    const before = await launch.boundingBox();
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(200);
+    const after = await launch.boundingBox();
+    expect(Math.abs(after.x - before.x)).toBeLessThan(2);
+    expect(Math.abs(after.y - before.y)).toBeLessThan(2);
+  });
+
+  test('clicking the bubble surfaces the author note, then opens the toolbar', async ({ page }) => {
+    await page.locator('#__an_launch').click();
+    const modal = page.locator('#__an_namewrap');
+    await expect(modal).toBeVisible();
+    // data-note from the demo embed is shown to the reviewer
+    await expect(modal.locator('.an-nnote')).toBeVisible();
+    await expect(modal.locator('.an-nnote')).toContainText(/review|hero|pricing/i);
+    await modal.locator('input').first().fill('Reviewer A');
+    await modal.locator('button').click();
+    await expect(modal).not.toBeVisible();
+    await expect(page.locator('#__an_bar')).toBeVisible();
+  });
+
+  test('author note banner shows atop the comments panel', async ({ page }) => {
+    await setName(page, 'Reviewer A');
+    await page.locator('[data-tool="cursor"]').waitFor();
+    await page.keyboard.press('a'); // open panel
+    await expect(page.locator('#__an_note')).toBeVisible();
+    await expect(page.locator('#__an_note')).toContainText('What to review');
+  });
+
+  test('Share button appears because data-share-email is configured', async ({ page }) => {
+    await setName(page, 'Reviewer A');
+    // create a pin so the footer renders with comments (mirrors the Pin tool test)
+    await page.keyboard.press('p');
+    await page.locator('header.hero h1').click();
+    const composer = page.locator('#__an_compose');
+    await expect(composer).toHaveClass(/an-show/);
+    await composer.locator('textarea').fill('A note');
+    await composer.locator('.an-primary').click();
+    await expect(page.locator('#__an_panel')).toHaveClass(/an-open/);
+    const footRow = page.locator('#__an_foot .an-footrow');
+    await expect(footRow.locator('button:has-text("Share")')).toBeVisible();
+    // Download button pulses to cue sharing
+    await expect(footRow.locator('button:has-text("Download")')).toHaveClass(/an-pulse/);
+  });
+
+  test('Share button opens a guided dialog instead of firing mailto blindly', async ({ page }) => {
+    await setName(page, 'Reviewer A');
+    // add a comment so there is something to share
+    await page.keyboard.press('p');
+    await page.locator('header.hero h1').click();
+    const composer = page.locator('#__an_compose');
+    await expect(composer).toHaveClass(/an-show/);
+    await composer.locator('textarea').fill('A note');
+    await composer.locator('.an-primary').click();
+    await expect(page.locator('#__an_panel')).toHaveClass(/an-open/);
+
+    await page.locator('#__an_foot .an-footrow button:has-text("Share")').click();
+    const dlg = page.locator('#__an_sharebox');
+    await expect(dlg).toBeVisible();
+    await expect(dlg.locator('.an-st')).toHaveText('Share your review');
+    // shows the author's email destination + clear instructions
+    await expect(dlg.locator('.an-sdest')).toContainText('reviews@example.com');
+    await expect(dlg.locator('.an-sstep')).toHaveCount(2);
+    await expect(dlg.locator('button:has-text("Download JSON")')).toBeVisible();
+    await expect(dlg.locator('button:has-text("Open email")')).toBeVisible();
+    await expect(dlg.locator('button:has-text("Copy summary")')).toBeVisible();
+    // closes via Done
+    await dlg.locator('button:has-text("Done")').click();
+    await expect(page.locator('#__an_sharewrap')).toHaveCount(0);
   });
 });
