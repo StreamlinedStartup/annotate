@@ -42,7 +42,7 @@
   "directories": {
     "example": "examples"
   },
-  "author": "",
+  "author": "Akash Goswami",
   "devDependencies": {
     "@playwright/test": "^1.61.0"
   }

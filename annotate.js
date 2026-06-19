@@ -973,8 +973,8 @@
     composer.appendChild(ta);
     var save = el("button", { class: "an-primary", text: "Comment" });
     var cancel = el("button", { class: "an-ghost", text: "Cancel" });
-    var isMac = /Mac|iPhone|iPad/i.test(navigator.userAgentData ? "" : (navigator.platform || navigator.userAgent || "")) ||
-      (navigator.userAgentData && navigator.userAgentData.platform === "macOS");
+    var plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || "";
+    var isMac = /Mac|iPhone|iPad/i.test(plat);
     composer.appendChild(el("div", { class: "an-cfoot" }, [
       el("span", { class: "an-ckbd", text: (isMac ? "⌘" : "Ctrl") + "↵ to post" }),
       cancel, save,
