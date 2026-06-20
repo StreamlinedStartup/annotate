@@ -61,7 +61,12 @@
   // localStorage can be denied (private mode, sandboxed iframes) — never crash
   var store = {
     get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
-    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+    set: function (k, v) {
+      try { localStorage.setItem(k, v); } catch (e) {
+        if (e && (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED"))
+          setTimeout(function () { toast("Storage full — export your comments before adding more.", { kind: "error", duration: 8000 }); }, 0);
+      }
+    },
   };
   var COLORS = [
     { name: "Amber", hex: "#f59e0b" },
@@ -157,7 +162,12 @@
   }
   function dbWrite(d) { store.set(STORE_KEY, JSON.stringify(d)); }
   function uid() {
-    return "c" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+    if (window.crypto && crypto.getRandomValues) {
+      var arr = new Uint32Array(3);
+      crypto.getRandomValues(arr);
+      return "c" + arr[0].toString(36) + arr[1].toString(36) + arr[2].toString(36);
+    }
+    return "c" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
   }
   function pageComments() {
     return dbRead().comments.filter(function (c) { return c.page === PAGE; });
@@ -190,6 +200,13 @@
     if (typeof changes.resolved === "boolean") c.resolved = changes.resolved;
     if (typeof changes.color === "string") c.color = changes.color;
     if (changes.reply) c.replies.push(changes.reply);
+    if (changes.editReply) {
+      var ri = c.replies.findIndex(function (r) { return r.id === changes.editReply.id; });
+      if (ri >= 0) { c.replies[ri] = Object.assign({}, c.replies[ri], { text: changes.editReply.text }); }
+    }
+    if (changes.deleteReply) {
+      c.replies = c.replies.filter(function (r) { return r.id !== changes.deleteReply; });
+    }
     c.updatedAt = new Date().toISOString();
     dbWrite(d);
     return c;
@@ -219,6 +236,25 @@
   }
   function resolveAnchorEl(selector) {
     try { return document.querySelector(selector); } catch (e) { return null; }
+  }
+
+  // Trap Tab focus inside a modal container; returns a cleanup function.
+  function trapFocus(container) {
+    function getFocusable() {
+      return Array.prototype.slice.call(
+        container.querySelectorAll("button:not([disabled]),input:not([disabled]),textarea:not([disabled]),[tabindex]")
+      ).filter(function (el) { return el.offsetParent !== null; });
+    }
+    function handler(e) {
+      if (e.key !== "Tab") return;
+      var focusable = getFocusable();
+      if (!focusable.length) return;
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
+    }
+    container.addEventListener("keydown", handler);
+    return function () { container.removeEventListener("keydown", handler); };
   }
 
   // ignore our own UI when walking content
@@ -962,6 +998,9 @@
     pinLayer.appendChild(tab);
   }
 
+  function viewportMismatch(g) {
+    return g && g.vw && Math.abs(g.vw - window.innerWidth) > 200;
+  }
   function renderGeom(c) {
     var anchorEl = c.geom.selector ? resolveAnchorEl(c.geom.selector) : document.body;
     if (!anchorEl) anchorEl = document.body;
@@ -1001,10 +1040,17 @@
     var bx = box.x + fx * box.w, by = box.y + fy * box.h;
     var idx = state.comments.indexOf(c) + 1;
     var badge = svgEl("g", {});
-    var circ = svgEl("circle", { cx: bx, cy: by, r: 11, fill: c.color, stroke: "#fff", "stroke-width": 2 });
+    var badgeR = viewportMismatch(g) ? 13 : 11;
+    var badgeFill = viewportMismatch(g) ? "#f59e0b" : c.color;
+    var circ = svgEl("circle", { cx: bx, cy: by, r: badgeR, fill: badgeFill, stroke: "#fff", "stroke-width": 2 });
     var txt = svgEl("text", { x: bx, y: by + 4, "text-anchor": "middle", fill: "#fff",
       "font-size": "11", "font-weight": "700", "font-family": "Inter, sans-serif" });
-    txt.textContent = idx;
+    txt.textContent = viewportMismatch(g) ? "⚠" : idx;
+    if (viewportMismatch(g)) {
+      var badgeTitle = svgEl("title");
+      badgeTitle.textContent = "Drawn at " + g.vw + "px wide — positions may differ on this viewport";
+      badge.appendChild(badgeTitle);
+    }
     badge.appendChild(circ); badge.appendChild(txt);
     badge.style.cursor = "pointer";
     badge.style.pointerEvents = "all";
@@ -1117,9 +1163,11 @@
     var box = el("div", { id: "__an_namebox" }, kids);
     wrap.appendChild(box);
     document.body.appendChild(wrap);
+    var releaseTrap = trapFocus(wrap);
     function done() {
       state.author = input.value.trim() || "Anonymous";
       store.set("an-author", state.author);
+      releaseTrap();
       wrap.remove();
       renderNote();
       if (onDone) onDone();
@@ -1206,7 +1254,8 @@
       var fx = (e.pageX - box.x) / box.w, fy = (e.pageY - box.y) / box.h;
       openComposer(e.clientX + 6, e.clientY + 6, {
         type: "pin", color: state.color,
-        geom: { kind: "pin", selector: cssPath(anchorEl), x: clamp01(fx), y: clamp01(fy) },
+        geom: { kind: "pin", selector: cssPath(anchorEl), x: clamp01(fx), y: clamp01(fy),
+          vw: window.innerWidth, vh: window.innerHeight },
       });
       return;
     }
@@ -1218,6 +1267,9 @@
         tool: t, anchorEl: anchor, box: docBox(anchor),
         startX: e.pageX, startY: e.pageY, points: [[e.pageX, e.pageY]], node: null,
       };
+      // Capture pointer so pointermove/pointerup are reliably delivered during touch drawing
+      if (e.pointerId != null && overlay && overlay.setPointerCapture)
+        try { overlay.setPointerCapture(e.pointerId); } catch (ex) {}
     }
   }
   function onMove(e) {
@@ -1261,22 +1313,30 @@
         clearSel(); justCancelledDraw = true; return setTool("cursor");
       }
       geom = { kind: "pen", selector: cssPath(d.anchorEl),
-        points: d.points.map(function (p) { return [(p[0] - box.x) / box.w, (p[1] - box.y) / box.h]; }) };
+        points: d.points.map(function (p) { return [(p[0] - box.x) / box.w, (p[1] - box.y) / box.h]; }),
+        vw: window.innerWidth, vh: window.innerHeight };
     } else {
       var x0 = Math.min(d.startX, e.pageX), y0 = Math.min(d.startY, e.pageY);
       var w = Math.abs(e.pageX - d.startX), h = Math.abs(e.pageY - d.startY);
       if (w < 6 && h < 6) { clearSel(); justCancelledDraw = true; return setTool("cursor"); }
       geom = { kind: d.tool === "circle" ? "circle" : "rect", selector: cssPath(d.anchorEl),
-        x: (x0 - box.x) / box.w, y: (y0 - box.y) / box.h, w: w / box.w, h: h / box.h };
+        x: (x0 - box.x) / box.w, y: (y0 - box.y) / box.h, w: w / box.w, h: h / box.h,
+        vw: window.innerWidth, vh: window.innerHeight };
     }
     openComposer(e.clientX + 6, e.clientY + 6, { type: d.tool === "pen" ? "pen" : "shape", color: state.color, geom: geom });
   }
+  var SEMANTIC_TAGS = /^(MAIN|ARTICLE|SECTION|ASIDE|HEADER|FOOTER|NAV)$/;
+  var CONTAINER_CLASSES = /\b(container|wrap(?:per)?|content|layout|inner|page)\b/;
   function pickAnchor(target) {
     var n = target;
     while (n && n !== document.body) {
-      if (n.id || (n.classList && (n.classList.contains("container") || n.classList.contains("svg-figure") || n.nodeName === "SECTION"))) {
+      if (isOurs(n)) { n = n.parentElement; continue; }
+      var hasId = !!n.id;
+      var isSemantic = SEMANTIC_TAGS.test(n.nodeName);
+      var isContainer = n.classList && CONTAINER_CLASSES.test(n.className);
+      if (hasId || isSemantic || isContainer) {
         var r = n.getBoundingClientRect();
-        if (r.width > 40 && r.height > 20) return n;
+        if (r.width > 80 && r.height > 40) return n;
       }
       n = n.parentElement;
     }
@@ -1295,6 +1355,8 @@
   var SIDE = CFG.position === "bottom-left" ? "an-left" : "an-right";
   function buildUI() {
     var style = el("style", { html: CSS_TEXT });
+    var _nonce = SCRIPT && (SCRIPT.nonce || SCRIPT.getAttribute("nonce"));
+    if (_nonce) style.setAttribute("nonce", _nonce);
     document.head.appendChild(style);
     applyTheme();
     if (CFG.accent) {
@@ -1437,8 +1499,17 @@
 
     var rt;
     window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
+    // Keep tabs in sync: reload annotations when another tab writes to storage
+    window.addEventListener("storage", function (e) {
+      if (e.key === STORE_KEY) load();
+    });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { setTimeout(renderAll, 60); });
     window.addEventListener("load", function () { setTimeout(renderAll, 120); });
+    // Resize overlay when page content grows (lazy images, dynamic content)
+    if (typeof ResizeObserver !== "undefined") {
+      var _ro = new ResizeObserver(function () { if (overlay) sizeOverlay(); });
+      _ro.observe(document.body);
+    }
   }
 
   function applyTheme() {
@@ -1497,22 +1568,24 @@
     plusBtn.addEventListener("mouseenter", function () { clearTimeout(plusHideTimer); });
     plusBtn.addEventListener("mouseleave", function () { hidePlus(); });
 
-    document.addEventListener("mouseover", function (e) {
-      if (!state.enabled) return;
-      if (state.tool !== "cursor" && state.tool !== "highlight") return;
-      if (drawing) return;
-      var blk = eligibleBlock(e.target);
-      if (blk && blk !== plusTarget) { plusTarget = blk; positionPlus(blk); }
-    });
+    var _plusMoveRaf = null;
     document.addEventListener("mousemove", function (e) {
-      if (!plusTarget) return;
-      if (state.tool !== "cursor" && state.tool !== "highlight") { hidePlus(true); return; }
-      if (inKeepZone(e.clientX, e.clientY)) {
-        clearTimeout(plusHideTimer);
-        plusBtn.classList.add("an-show");
-      } else {
-        hidePlus();
-      }
+      if (_plusMoveRaf) return;
+      _plusMoveRaf = requestAnimationFrame(function () {
+        _plusMoveRaf = null;
+        if (!state.enabled) return;
+        if (state.tool !== "cursor" && state.tool !== "highlight") { hidePlus(true); return; }
+        if (drawing) return;
+        var blk = eligibleBlock(e.target || document.elementFromPoint(e.clientX, e.clientY));
+        if (blk && blk !== plusTarget) { plusTarget = blk; positionPlus(blk); }
+        if (!plusTarget) return;
+        if (inKeepZone(e.clientX, e.clientY)) {
+          clearTimeout(plusHideTimer);
+          plusBtn.classList.add("an-show");
+        } else {
+          hidePlus();
+        }
+      });
     });
     // Touch: long-press any eligible block to reveal the + button
     var touchHoldTimer = null, touchHoldTarget = null;
@@ -1717,28 +1790,45 @@
       if (c.replies && c.replies.length) {
         var rep = el("div", { class: "an-replies" });
         c.replies.forEach(function (r) {
-          rep.appendChild(el("div", { class: "an-reply" }, [
+          var replyRow = el("div", { class: "an-reply" }, [
             avatarEl(r.author, 18),
-            el("span", {}, [
+            el("span", { style: "flex:1;min-width:0" }, [
               el("span", { class: "an-rwho", text: r.author }),
               document.createTextNode(r.text),
               el("span", { class: "an-rwhen", text: fmtTime(r.createdAt) }),
             ]),
-          ]));
+          ]);
+          if (r.author === state.author) {
+            var rAct = el("span", { style: "display:flex;gap:4px;flex:none;margin-left:6px" });
+            var rDel = el("button", { class: "an-mini an-danger", html: ICONS.trash, title: "Delete reply" });
+            rDel.addEventListener("click", function (e) {
+              e.stopPropagation();
+              var updated = patchComment(c.id, { deleteReply: r.id });
+              if (updated) { mergeComment(updated); renderPanel(); }
+            });
+            rAct.appendChild(rDel);
+            replyRow.appendChild(rAct);
+          }
+          rep.appendChild(replyRow);
         });
         card.appendChild(rep);
       }
 
       var rbox = el("div", { class: "an-replybox" });
-      var rin = el("input", { class: "an-input", placeholder: "Reply…" });
+      var rin = el("textarea", { class: "an-ta", rows: "2", placeholder: "Reply… (Ctrl+↵ to post)" });
       rbox.appendChild(rin);
+      var rsend = el("button", { class: "an-primary", style: "margin-top:6px;align-self:flex-end", text: "Reply" });
+      rbox.appendChild(rsend);
+      function submitReply() {
+        if (!rin.value.trim()) return;
+        var reply = { id: uid(), author: state.author || "Anonymous", text: rin.value.trim(), createdAt: new Date().toISOString() };
+        var updated = patchComment(c.id, { reply: reply });
+        if (updated) { rin.value = ""; mergeComment(updated); renderPanel(); }
+      }
+      rsend.addEventListener("click", function (e) { e.stopPropagation(); submitReply(); });
       rin.addEventListener("keydown", function (e) {
         e.stopPropagation();
-        if (e.key === "Enter" && rin.value.trim()) {
-          var reply = { id: uid(), author: state.author || "Anonymous", text: rin.value.trim(), createdAt: new Date().toISOString() };
-          var updated = patchComment(c.id, { reply: reply });
-          if (updated) { mergeComment(updated); renderPanel(); }
-        }
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submitReply();
       });
       card.appendChild(rbox);
 
@@ -1815,6 +1905,7 @@
       page: PAGE,
       url: location.href,
       project: CFG.project || "",
+      exportedViewport: { vw: window.innerWidth, vh: window.innerHeight, dpr: window.devicePixelRatio || 1 },
       comments: comments,
     };
     var slug = (PAGE || "page").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "page";
@@ -1844,14 +1935,29 @@
     inp.click();
   }
 
+  function isValidGeom(g) {
+    if (!g || typeof g.kind !== "string") return false;
+    if (g.kind === "pin" || g.kind === "rect" || g.kind === "circle")
+      return typeof g.x === "number" && isFinite(g.x) && typeof g.y === "number" && isFinite(g.y);
+    if (g.kind === "pen")
+      return Array.isArray(g.points) && g.points.length >= 2 && g.points.length <= 10000 &&
+        g.points.every(function (p) { return Array.isArray(p) && p.length === 2 && isFinite(p[0]) && isFinite(p[1]); });
+    if (g.kind === "block") return typeof g.selector === "string" && g.selector.length < 4096;
+    return true;
+  }
   function importComments(data) {
     var incoming = data && Array.isArray(data.comments) ? data.comments : null;
     if (!incoming) { toast("No comments found in that file", { kind: "error" }); return; }
+    // Warn if the export came from a different page
+    if (data.page && data.page !== PAGE)
+      toast("These comments were from a different page — positions may not match.", { kind: "info", duration: 6000 });
     var existing = {};
     state.comments.forEach(function (c) { existing[c.id] = true; });
     var prepared = [];
     incoming.forEach(function (c) {
-      if (!c || !c.text && !c.anchor && !c.geom) return;
+      if (!c || (!c.text && !c.anchor && !c.geom)) return;
+      if (c.geom && !isValidGeom(c.geom)) return;  // reject malformed geometry
+      if (c.anchor && c.anchor.exact && String(c.anchor.exact).length > 10000) return;
       var copy = JSON.parse(JSON.stringify(c));
       copy.page = PAGE;
       if (!copy.id || existing[copy.id]) copy.id = uid();
@@ -1877,7 +1983,6 @@
   // delete with undo — remove locally now, persist when the toast expires
   var pendingDeletes = {};
   function deleteComment(c) {
-    var idx = state.comments.indexOf(c);
     state.comments = state.comments.filter(function (x) { return x.id !== c.id; });
     if (state.activeId === c.id) state.activeId = null;
     pendingDeletes[c.id] = c;
@@ -1886,7 +1991,14 @@
       kind: "info", action: "Undo", duration: 5000,
       onAction: function () {
         delete pendingDeletes[c.id];
-        state.comments.splice(Math.min(idx, state.comments.length), 0, c);
+        // Re-insert in chronological order so concurrent deletes don't break positions
+        var inserted = false;
+        for (var i = 0; i < state.comments.length; i++) {
+          if (state.comments[i].createdAt > c.createdAt) {
+            state.comments.splice(i, 0, c); inserted = true; break;
+          }
+        }
+        if (!inserted) state.comments.push(c);
         renderAll(); renderPanel();
       },
       onExpire: function () {
@@ -1952,7 +2064,7 @@
 
   // Build the plain-text review summary used in emails / chat messages.
   function shareSummary(comments) {
-    var visible = comments.slice(0, 25);
+    var visible = comments.slice(0, 50);
     var lines = visible.map(function (c, i) {
       var who = c.author || "Anonymous";
       var what = clipText(c.text, 280) || "(no text)";
@@ -2050,6 +2162,10 @@
     var wrap = el("div", { id: "__an_sharewrap" }, [box]);
     wrap.addEventListener("click", function (e) { if (e.target === wrap) closeShareDialog(); });
     document.body.appendChild(wrap);
+    var _shareTrap = trapFocus(wrap);
+    var _origClose = closeShareDialog;
+    closeShareDialog = function () { _shareTrap(); closeShareDialog = _origClose; _origClose(); };
+    setTimeout(function () { var f = wrap.querySelector("button"); if (f) f.focus(); }, 40);
   }
 
   function mergeComment(updated) {

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>annotate.js — start-open demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 740px; margin: 0 auto; padding: 40px 24px; color: #1f2328; background: #f7f1e5; }
+    header.hero h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 16px; }
+    p.lead { font-size: 1.1rem; line-height: 1.65; color: #5f5668; margin: 0 0 24px; }
+    section { margin-top: 48px; }
+    h2 { font-size: 1.4rem; margin: 0 0 12px; }
+  </style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Review this page — toolbar is open by default</h1>
+  <p class="lead">This example uses <code>data-start-open="true"</code> so the toolbar appears immediately without the reviewer having to click the review bubble first.</p>
+</header>
+
+<section>
+  <h2>Content to review</h2>
+  <p>Select text, press <kbd>R</kbd> to draw a rectangle, or press <kbd>P</kbd> to drop a pin on any element.</p>
+  <p>The panel is intentionally closed on startup — the reviewer can open it with <kbd>A</kbd> or by clicking the comments icon.</p>
+</section>
+
+<script
+  src="/annotate.js"
+  data-project="annotate-demo"
+  data-accent="#6d28d9"
+  data-theme="auto"
+  data-start-open="true"
+  defer
+></script>
+</body>
+</html>

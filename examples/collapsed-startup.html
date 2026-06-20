@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>annotate.js — collapsed startup demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 740px; margin: 0 auto; padding: 40px 24px; color: #1f2328; background: #f7f1e5; }
+    header.hero h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 16px; }
+    p.lead { font-size: 1.1rem; line-height: 1.65; color: #5f5668; margin: 0 0 24px; }
+    section { margin-top: 48px; }
+    h2 { font-size: 1.4rem; margin: 0 0 12px; }
+  </style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Review this page</h1>
+  <p class="lead">This example starts as the collapsed "Review" pill. Click the pill to reveal the toolbar and add comments. The author's note and share destination are pre-configured.</p>
+</header>
+
+<section>
+  <h2>Hero copy &amp; pricing</h2>
+  <p>Focus your feedback on the hero section and pricing table. Flag anything that looks off-brand or confusing.</p>
+  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+</section>
+
+<section>
+  <h2>Pricing section</h2>
+  <p>Does the pricing feel competitive? Is the value proposition clear? Leave a pin or highlight if something needs attention.</p>
+</section>
+
+<script
+  src="/annotate.js"
+  data-project="annotate-demo"
+  data-accent="#6d28d9"
+  data-theme="auto"
+  data-position="bottom-right"
+  data-note="Focus on the hero copy &amp; pricing — flag anything off-brand or confusing."
+  data-share-email="reviews@example.com"
+  defer
+></script>
+</body>
+</html>
