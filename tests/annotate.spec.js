@@ -472,12 +472,12 @@ test.describe('Export / Import', () => {
 // THEME
 // ============================================================
 test.describe('Theme', () => {
-  test('auto theme detects dark background', async ({ page }) => {
-    // index.html uses the dark marketing background.
+  test('landing page uses the light annotation theme', async ({ page }) => {
+    // index.html uses the cream light marketing background.
     const isDark = await page.evaluate(() =>
       document.documentElement.classList.contains('an-dark')
     );
-    expect(isDark).toBe(true);
+    expect(isDark).toBe(false);
   });
 
   test('dark theme class applied when forced', async ({ page }) => {
