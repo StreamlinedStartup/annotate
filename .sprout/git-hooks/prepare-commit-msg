@@ -1,0 +1,6 @@
+#!/bin/sh
+if command -v sprout >/dev/null 2>&1; then
+  exec sprout hook run --provider git --event prepare-commit-msg "$@"
+fi
+echo "sprout hook warning: sprout executable not found on PATH" >&2
+exit 0
