@@ -13,7 +13,7 @@ MarkUS has two operating modes:
   self-hosted PocketBase service.
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js" defer></script>
+<script src="https://unpkg.com/@vulture916/markus/markus.js" defer></script>
 ```
 
 That single line is enough for local-only reviews.
@@ -62,13 +62,13 @@ comments and replies, and JSON download/import.
 Add this before `</body>`:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js" defer></script>
+<script src="https://unpkg.com/@vulture916/markus/markus.js" defer></script>
 ```
 
 To pin a production version:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@markus/client@1.1.0/markus.js" defer></script>
+<script src="https://unpkg.com/@vulture916/markus@1.1.0/markus.js" defer></script>
 ```
 
 Self-host the client by copying [`markus.js`](./markus.js) or
@@ -84,7 +84,7 @@ Live mode is enabled only when all three live attributes are present:
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js"
+  src="https://unpkg.com/@vulture916/markus/markus.js"
   data-project="marketing-site"
   data-page="/pricing"
   data-review-id="launch-homepage-v3"
@@ -107,7 +107,7 @@ Configure with `data-` attributes on the script tag:
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js"
+  src="https://unpkg.com/@vulture916/markus/markus.js"
   data-project="marketing-site"
   data-page="/pricing"
   data-accent="#6d28d9"
@@ -153,7 +153,7 @@ Prefer JavaScript config? Set `window.MarkUSConfig` before the script loads:
     publicKey: "rvw_pub_...",
   };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js" defer></script>
+<script src="https://unpkg.com/@vulture916/markus/markus.js" defer></script>
 ```
 
 `window.AnnotateConfig` remains supported as a compatibility alias.
@@ -271,7 +271,7 @@ export default function MarkUSReview() {
     };
     const script = document.createElement("script");
     script.id = "markus-js";
-    script.src = "https://cdn.jsdelivr.net/npm/@markus/client/markus.js";
+    script.src = "https://unpkg.com/@vulture916/markus/markus.js";
     script.defer = true;
     document.body.appendChild(script);
   }, []);
@@ -291,7 +291,7 @@ export default function RootLayout({ children }) {
       <body>
         {children}
         <Script
-          src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js"
+          src="https://unpkg.com/@vulture916/markus/markus.js"
           strategy="afterInteractive"
         />
       </body>
@@ -306,7 +306,7 @@ Paste the script before `</body>` or into the platform's custom footer field:
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js"
+  src="https://unpkg.com/@vulture916/markus/markus.js"
   data-project="website-review"
   defer
 ></script>
