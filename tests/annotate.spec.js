@@ -788,6 +788,120 @@ test.describe('Framework integration pages', () => {
 });
 
 // ============================================================
+// LIVE MARKUS MODE
+// ============================================================
+test.describe('Live MarkUS mode', () => {
+  async function routeLivePage(page, body = '') {
+    await page.route('**/live-markus.html', route => route.fulfill({
+      contentType: 'text/html',
+      body: `<!doctype html>
+        <html>
+          <head><title>Live MarkUS test</title></head>
+          <body>
+            <main><h1>Live MarkUS test</h1><p>Shared review target.</p>${body}</main>
+            <script
+              src="/markus.js"
+              data-project="live-markus"
+              data-page="/live-markus"
+              data-review-id="launch-homepage-v3"
+              data-api-base-url="http://localhost:4200"
+              data-public-key="rvw_pub_test"
+              data-realtime="false"
+              data-start-open="true"
+              defer></script>
+          </body>
+        </html>`,
+    }));
+  }
+
+  test('loads shared comments from the scoped live API', async ({ page }) => {
+    await routeLivePage(page);
+    await page.route('**/api/reviews/launch-homepage-v3/comments**', route => {
+      expect(route.request().headers()['x-markus-public-key']).toBe('rvw_pub_test');
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          comments: [{
+            id: 'srv_comment_1',
+            page: 'live-markus:/live-markus',
+            url: 'http://127.0.0.1/live-markus',
+            type: 'pin',
+            author: 'Live Reviewer',
+            text: 'Shared live comment',
+            color: '#f59e0b',
+            geom: { kind: 'pin', selector: 'body', x: 0.4, y: 0.2 },
+            resolved: false,
+            replies: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }],
+        }),
+      });
+    });
+
+    await page.goto('/live-markus.html');
+    await page.waitForFunction(() => window.MarkUS && window.MarkUS.config.live.enabled);
+    await expect(page.locator('.an-card')).toHaveCount(1);
+    await expect(page.locator('.an-card')).toContainText('Shared live comment');
+    await expect(page.locator('#__an_foot')).toContainText('Live shared review');
+  });
+
+  test('posts new comments to the live API and uses the saved record', async ({ page }) => {
+    await routeLivePage(page);
+    await page.route('**/api/reviews/launch-homepage-v3/comments**', async route => {
+      const req = route.request();
+      if (req.method() === 'GET') {
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ comments: [] }) });
+        return;
+      }
+
+      expect(req.method()).toBe('POST');
+      expect(req.headers()['x-markus-public-key']).toBe('rvw_pub_test');
+      const payload = req.postDataJSON();
+      expect(payload.comment.text).toBe('Live pin saved');
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          comment: { ...payload.comment, id: 'srv_created_1', livePending: false },
+        }),
+      });
+    });
+
+    await page.goto('/live-markus.html');
+    await page.waitForFunction(() => window.MarkUS && window.MarkUS.config.live.enabled);
+    await page.keyboard.press('p');
+    await page.locator('h1').click();
+    await page.locator('#__an_compose textarea').fill('Live pin saved');
+    await page.locator('#__an_compose .an-primary').click();
+
+    await expect(page.locator('.an-card[data-id="srv_created_1"]')).toContainText('Live pin saved');
+    await expect(page.locator('.an-card')).not.toContainText('Offline draft');
+  });
+
+  test('keeps failed live writes as explicit offline drafts', async ({ page }) => {
+    await routeLivePage(page);
+    await page.route('**/api/reviews/launch-homepage-v3/comments**', async route => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ comments: [] }) });
+        return;
+      }
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'offline' }) });
+    });
+
+    await page.goto('/live-markus.html');
+    await page.waitForFunction(() => window.MarkUS && window.MarkUS.config.live.enabled);
+    await page.keyboard.press('p');
+    await page.locator('h1').click();
+    await page.locator('#__an_compose textarea').fill('Save when back online');
+    await page.locator('#__an_compose .an-primary').click();
+
+    await expect(page.locator('.an-card')).toContainText('Save when back online');
+    await expect(page.locator('.an-card')).toContainText('Offline draft');
+    await expect(page.locator('#__an_foot')).toContainText('Offline draft');
+  });
+});
+
+// ============================================================
 // ANCHOR DEEP-LINK
 // ============================================================
 test.describe('Deep linking', () => {

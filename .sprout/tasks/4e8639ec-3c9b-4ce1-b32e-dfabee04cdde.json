@@ -1,13 +1,13 @@
 {
   "id": "4e8639ec-3c9b-4ce1-b32e-dfabee04cdde",
-  "revision": 2,
+  "revision": 7,
   "title": "Add live MarkUS client data layer",
   "description": "Add live-mode configuration from data-review-id, data-api-base-url, and data-public-key. Implement scoped API operations, realtime subscription wiring, offline draft queue states, and tests with mocked backend responses while preserving local-only behavior when live config is absent.",
-  "status": "todo",
+  "status": "done",
   "priority": "high",
   "epic_number": 1,
   "created_at": "2026-06-21T22:52:32-07:00",
-  "updated_at": "2026-06-21T22:53:09-07:00",
+  "updated_at": "2026-06-21T23:18:09-07:00",
   "git_branch": "epic/1-markus-live-shared-review",
   "affected_files": [
     {
@@ -21,6 +21,14 @@
   ],
   "verify_command": "bunx playwright test --project=chromium tests/annotate.spec.js",
   "consecutive_failures": 0,
+  "agent_notes": [
+    {
+      "timestamp": "2026-06-21T23:17:07-07:00",
+      "author": "agent",
+      "kind": "decision",
+      "content": "Live mode is opt-in only when reviewId, apiBaseUrl, and publicKey are configured. The browser client keeps local-only behavior unchanged, uses optimistic local drafts for writes, labels failed writes as Offline draft, and exposes EventSource wiring for future backend realtime events."
+    }
+  ],
   "events": [
     {
       "timestamp": "2026-06-21T22:52:32-07:00",
@@ -39,8 +47,41 @@
       "timestamp": "2026-06-21T22:53:09-07:00",
       "kind": "updated",
       "description": "Task updated"
+    },
+    {
+      "timestamp": "2026-06-21T23:12:19-07:00",
+      "kind": "started",
+      "description": "Task started",
+      "metadata": {
+        "agent": "codex"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T23:17:07-07:00",
+      "kind": "note_added",
+      "description": "Agent note added",
+      "metadata": {
+        "author": "agent",
+        "kind": "decision"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T23:18:02-07:00",
+      "kind": "verified",
+      "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-21T23:18:09-07:00",
+      "kind": "updated",
+      "description": "Task updated"
+    },
+    {
+      "timestamp": "2026-06-21T23:18:09-07:00",
+      "kind": "released",
+      "description": "Task lease released"
     }
   ],
+  "summary": "Added opt-in live mode configuration, scoped public API requests, live comment loading, optimistic create syncing, offline draft persistence and labeling, EventSource realtime wiring, and mocked browser tests for live load/create/offline behavior while preserving local-only mode.",
   "dependencies": [
     {
       "id": "be511559-088a-49cb-bda7-57f4634f8713",

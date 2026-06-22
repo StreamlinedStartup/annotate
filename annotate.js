@@ -55,6 +55,16 @@
     startOpen: truthy(scriptData.startOpen || globalConfig.startOpen),
     note: scriptData.note || globalConfig.note || "",
     share: String(scriptData.shareEmail || globalConfig.shareEmail || "").trim(),
+    reviewId: String(scriptData.reviewId || globalConfig.reviewId || "").trim(),
+    apiBaseUrl: String(scriptData.apiBaseUrl || globalConfig.apiBaseUrl || "").replace(/\/+$/, ""),
+    publicKey: String(scriptData.publicKey || globalConfig.publicKey || "").trim(),
+    realtime: String(scriptData.realtime || globalConfig.realtime || "true").toLowerCase() !== "false",
+  };
+  CFG.live = {
+    enabled: !!(CFG.reviewId && CFG.apiBaseUrl && CFG.publicKey),
+    reviewId: CFG.reviewId,
+    apiBaseUrl: CFG.apiBaseUrl,
+    realtime: CFG.realtime,
   };
   var PAGE = (CFG.project ? CFG.project + ":" : "") + CFG.page;
 
@@ -90,6 +100,7 @@
     filter: "open", // open | resolved | all
     query: "",
     enabled: store.get("an-off") !== "1", // master on/off
+    liveStatus: CFG.live.enabled ? "connecting" : "local",
   };
 
   // --------------------------------------------------------------------------
@@ -153,6 +164,8 @@
   // --------------------------------------------------------------------------
   // localStorage key holding this project's entire comment blob
   var STORE_KEY = "annotate:" + (CFG.project || location.host || "default");
+  var LIVE_DRAFT_KEY = STORE_KEY + ":live-drafts:" + (CFG.reviewId || "local") + ":" + PAGE;
+  var liveEvents = null;
   function dbRead() {
     var d;
     try { d = JSON.parse(store.get(STORE_KEY) || "null"); } catch (e) { d = null; }
@@ -161,6 +174,171 @@
     return d;
   }
   function dbWrite(d) { store.set(STORE_KEY, JSON.stringify(d)); }
+  function liveDrafts() {
+    var d;
+    try { d = JSON.parse(store.get(LIVE_DRAFT_KEY) || "[]"); } catch (e) { d = []; }
+    return Array.isArray(d) ? d : [];
+  }
+  function writeLiveDrafts(items) { store.set(LIVE_DRAFT_KEY, JSON.stringify(items || [])); }
+  function saveLiveDraft(comment) {
+    var items = liveDrafts().filter(function (c) { return c.id !== comment.id; });
+    items.push(comment);
+    writeLiveDrafts(items);
+  }
+  function removeLiveDraft(id) {
+    writeLiveDrafts(liveDrafts().filter(function (c) { return c.id !== id; }));
+  }
+  function mergeLiveDrafts(remote) {
+    var seen = {};
+    remote.forEach(function (c) { seen[c.id] = true; });
+    return remote.concat(liveDrafts().filter(function (c) { return !seen[c.id]; }));
+  }
+  function sanitizedUrl() {
+    return location.origin + location.pathname + location.search;
+  }
+  function normalizeComment(c) {
+    c = c || {};
+    var copy = Object.assign({}, c);
+    copy.id = copy.id || uid();
+    copy.page = copy.page || PAGE;
+    copy.url = copy.url || sanitizedUrl();
+    copy.type = copy.type || "note";
+    copy.author = copy.author || "Anonymous";
+    copy.text = String(copy.text || "").slice(0, 5000);
+    copy.color = copy.color || state.color;
+    copy.anchor = copy.anchor || null;
+    copy.geom = copy.geom || null;
+    copy.resolved = !!copy.resolved;
+    if (!Array.isArray(copy.replies)) copy.replies = [];
+    copy.createdAt = copy.createdAt || new Date().toISOString();
+    copy.updatedAt = copy.updatedAt || copy.createdAt;
+    return copy;
+  }
+  function liveCommentPayload(comment) {
+    var copy = JSON.parse(JSON.stringify(comment));
+    delete copy.livePending;
+    delete copy.liveError;
+    copy.page = PAGE;
+    copy.url = sanitizedUrl();
+    return copy;
+  }
+  function liveUrl(path) {
+    return CFG.apiBaseUrl + "/api/reviews/" + encodeURIComponent(CFG.reviewId) + path;
+  }
+  function liveRequest(method, path, body) {
+    var opts = {
+      method: method,
+      headers: {
+        "content-type": "application/json",
+        "x-markus-public-key": CFG.publicKey,
+      },
+    };
+    if (body) opts.body = JSON.stringify(body);
+    return fetch(liveUrl(path), opts).then(function (res) {
+      if (!res.ok) throw new Error("Live review request failed: " + res.status);
+      return res.json();
+    });
+  }
+  function setLiveStatus(status) {
+    state.liveStatus = status;
+    renderPanel();
+  }
+  function liveListPath() {
+    return "/comments?page=" + encodeURIComponent(PAGE);
+  }
+  function syncLiveList() {
+    if (!CFG.live.enabled) return;
+    setLiveStatus("connecting");
+    liveRequest("GET", liveListPath()).then(function (data) {
+      var incoming = Array.isArray(data) ? data : (data.comments || []);
+      state.comments = mergeLiveDrafts(incoming.map(normalizeComment));
+      state.liveStatus = "online";
+      renderAll();
+      renderPanel();
+    }).catch(function () {
+      state.liveStatus = liveDrafts().length ? "offline" : "unavailable";
+      state.comments = mergeLiveDrafts([]);
+      renderAll();
+      renderPanel();
+    });
+  }
+  function syncLiveCreate(comment) {
+    liveRequest("POST", "/comments", {
+      reviewId: CFG.reviewId,
+      page: PAGE,
+      publicKey: CFG.publicKey,
+      comment: liveCommentPayload(comment),
+    }).then(function (data) {
+      var saved = normalizeComment(data.comment || data);
+      removeLiveDraft(comment.id);
+      state.comments = state.comments.filter(function (c) { return c.id !== comment.id; });
+      mergeComment(saved);
+      state.activeId = saved.id;
+      state.liveStatus = "online";
+      renderAll();
+      renderPanel();
+    }).catch(function () {
+      comment.livePending = true;
+      comment.liveError = "offline";
+      saveLiveDraft(comment);
+      state.liveStatus = "offline";
+      renderPanel();
+      toast("Offline draft saved locally. Retry when the review service is available.", { kind: "error", duration: 7000 });
+    });
+  }
+  function syncLivePatch(id, changes, updated) {
+    if (updated.livePending) { saveLiveDraft(updated); return; }
+    liveRequest("PATCH", "/comments/" + encodeURIComponent(id), {
+      reviewId: CFG.reviewId,
+      page: PAGE,
+      changes: changes,
+    }).then(function (data) {
+      mergeComment(normalizeComment(data.comment || data || updated));
+      state.liveStatus = "online";
+      renderAll();
+      renderPanel();
+    }).catch(function () {
+      updated.livePending = true;
+      updated.liveError = "offline";
+      saveLiveDraft(updated);
+      state.liveStatus = "offline";
+      renderPanel();
+    });
+  }
+  function syncLiveDelete(id) {
+    liveRequest("DELETE", "/comments/" + encodeURIComponent(id), {
+      reviewId: CFG.reviewId,
+      page: PAGE,
+    }).then(function () {
+      state.liveStatus = "online";
+      renderPanel();
+    }).catch(function () {
+      state.liveStatus = "offline";
+      renderPanel();
+    });
+  }
+  function subscribeLive() {
+    if (!CFG.live.enabled || !CFG.realtime || liveEvents || typeof EventSource === "undefined") return;
+    var url = liveUrl("/events?page=" + encodeURIComponent(PAGE) + "&publicKey=" + encodeURIComponent(CFG.publicKey));
+    try {
+      liveEvents = new EventSource(url);
+      liveEvents.onmessage = function (evt) {
+        var data;
+        try { data = JSON.parse(evt.data); } catch (e) { return; }
+        if (data.comment) {
+          mergeComment(normalizeComment(data.comment));
+          renderAll();
+          renderPanel();
+        }
+        if (data.deletedId) {
+          state.comments = state.comments.filter(function (c) { return c.id !== data.deletedId; });
+          renderAll();
+          renderPanel();
+        }
+      };
+      liveEvents.onerror = function () { state.liveStatus = "unavailable"; renderPanel(); };
+    } catch (e) {}
+  }
   function uid() {
     if (window.crypto && crypto.getRandomValues) {
       var arr = new Uint32Array(3);
@@ -170,10 +348,11 @@
     return "c" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
   }
   function pageComments() {
+    if (CFG.live.enabled) return liveDrafts();
     return dbRead().comments.filter(function (c) { return c.page === PAGE; });
   }
   function createComment(draft) {
-    var d = dbRead(), now = new Date().toISOString();
+    var d = CFG.live.enabled ? null : dbRead(), now = new Date().toISOString();
     var c = {
       id: uid(),
       page: PAGE,
@@ -189,10 +368,33 @@
       createdAt: now,
       updatedAt: now,
     };
+    if (CFG.live.enabled) {
+      c.livePending = true;
+      saveLiveDraft(c);
+      syncLiveCreate(c);
+      return c;
+    }
     d.comments.push(c); dbWrite(d);
     return c;
   }
   function patchComment(id, changes) {
+    if (CFG.live.enabled) {
+      var liveComment = state.comments.filter(function (x) { return x.id === id; })[0];
+      if (!liveComment) return null;
+      if (typeof changes.text === "string") liveComment.text = changes.text.slice(0, 5000);
+      if (typeof changes.resolved === "boolean") liveComment.resolved = changes.resolved;
+      if (typeof changes.color === "string") liveComment.color = changes.color;
+      if (changes.reply) liveComment.replies.push(changes.reply);
+      if (changes.editReply) {
+        var lri = liveComment.replies.findIndex(function (r) { return r.id === changes.editReply.id; });
+        if (lri >= 0) liveComment.replies[lri] = Object.assign({}, liveComment.replies[lri], { text: changes.editReply.text });
+      }
+      if (changes.deleteReply) liveComment.replies = liveComment.replies.filter(function (r) { return r.id !== changes.deleteReply; });
+      liveComment.updatedAt = new Date().toISOString();
+      if (liveComment.livePending) saveLiveDraft(liveComment);
+      syncLivePatch(id, changes, liveComment);
+      return liveComment;
+    }
     var d = dbRead();
     var c = d.comments.filter(function (x) { return x.id === id; })[0];
     if (!c) return null;
@@ -212,6 +414,12 @@
     return c;
   }
   function removeComment(id) {
+    if (CFG.live.enabled) {
+      state.comments = state.comments.filter(function (c) { return c.id !== id; });
+      removeLiveDraft(id);
+      syncLiveDelete(id);
+      return;
+    }
     var d = dbRead();
     d.comments = d.comments.filter(function (c) { return c.id !== id; });
     dbWrite(d);
@@ -1774,13 +1982,14 @@
       var meta = el("div", { class: "an-cmeta" }, [
         avatarEl(c.author),
         el("span", { class: "an-author", text: c.author || "Anonymous" }),
-        el("span", { class: "an-tag" }, [
-          (function(){ var d = el("span",{class:"an-dot"}); d.style.background=c.color; return d; })(),
-          document.createTextNode("#" + idx + " " + (TYPE_LABEL[c.type] || c.type)),
-        ]),
-        c.resolved ? el("span", { class: "an-rbadge", html: ICONS.check + "<span>Resolved</span>" }) : null,
-        el("span", { class: "an-when", text: fmtTime(c.createdAt) }),
-      ]);
+	        el("span", { class: "an-tag" }, [
+	          (function(){ var d = el("span",{class:"an-dot"}); d.style.background=c.color; return d; })(),
+	          document.createTextNode("#" + idx + " " + (TYPE_LABEL[c.type] || c.type)),
+	        ]),
+	        c.livePending ? el("span", { class: "an-rbadge", html: ICONS.info + "<span>Offline draft</span>" }) : null,
+	        c.resolved ? el("span", { class: "an-rbadge", html: ICONS.check + "<span>Resolved</span>" }) : null,
+	        el("span", { class: "an-when", text: fmtTime(c.createdAt) }),
+	      ]);
       card.appendChild(meta);
       if (c.type === "highlight" && c.anchor && c.anchor.exact)
         card.appendChild(el("div", { class: "an-quote", text: '“' + c.anchor.exact + '”' }));
@@ -2023,17 +2232,26 @@
     }
   }
 
-  function renderFooter() {
-    if (!footEl) return;
-    var n = state.comments.length;
-    var canShare = !!(state.share && state.share.trim());
-    footEl.innerHTML = "";
-    footEl.appendChild(el("div", { class: "an-localnote" }, [
-      el("span", { html: ICONS.info }),
-      el("span", { text: canShare
-        ? "Saved in this browser. Download or share to send your comments."
-        : "Saved in this browser. Download to send your comments." }),
-    ]));
+	  function renderFooter() {
+	    if (!footEl) return;
+	    var n = state.comments.length;
+	    var canShare = !!(state.share && state.share.trim());
+	    var liveCopy = CFG.live.enabled
+	      ? state.liveStatus === "online"
+	        ? "Live shared review. Comments are synced with the review service."
+	        : state.liveStatus === "offline"
+	          ? "Offline draft saved locally. Retry when the review service is available."
+	          : state.liveStatus === "unavailable"
+	            ? "Review service unavailable. New comments stay as offline drafts."
+	            : "Connecting to live shared review…"
+	      : "";
+	    footEl.innerHTML = "";
+	    footEl.appendChild(el("div", { class: "an-localnote" }, [
+	      el("span", { html: ICONS.info }),
+	      el("span", { text: liveCopy || (canShare
+	        ? "Saved in this browser. Download or share to send your comments."
+	        : "Saved in this browser. Download to send your comments.") }),
+	    ]));
     footEl.appendChild(el("div", { class: "an-footrow" }, [
       el("button", { class: "an-fbtn" + (n ? " an-pulse" : ""), title: "Download comments as JSON", html: ICONS.download + "<span>Download</span>", onclick: exportComments }),
       canShare ? el("button", { class: "an-fbtn", title: "Send comments to " + state.share, html: ICONS.share + "<span>Share</span>", onclick: shareComments }) : null,
@@ -2204,12 +2422,16 @@
   // BOOT
   // ==========================================================================
   var firstLoad = true;
-  function load() {
-    if (pendingDraft || drawing) return;
-    state.comments = pageComments().filter(function (c) { return !pendingDeletes[c.id]; });
-    renderAll();
-    renderPanel();
-    if (firstLoad) {
+	  function load() {
+	    if (pendingDraft || drawing) return;
+	    state.comments = pageComments().filter(function (c) { return !pendingDeletes[c.id]; });
+	    renderAll();
+	    renderPanel();
+	    if (CFG.live.enabled) {
+	      syncLiveList();
+	      subscribeLive();
+	    }
+	    if (firstLoad) {
       firstLoad = false;
       var m = location.hash.match(/^#an=(.+)$/);
       if (m) {
