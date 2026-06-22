@@ -1,13 +1,13 @@
 {
   "id": "ec953807-60c9-4ba5-b0af-e498dd2a6d85",
-  "revision": 15,
+  "revision": 17,
   "title": "Scaffold self-hosted PocketBase service",
   "description": "Add the v1 MarkUS PocketBase service scaffold with collections/migrations, public review endpoint hooks, scoped origin/public-key validation, rate-limit and sanitization placeholders, Docker Compose deployment, and service-level verification.",
-  "status": "in-progress",
+  "status": "done",
   "priority": "medium",
   "epic_number": 1,
   "created_at": "2026-06-21T22:52:43-07:00",
-  "updated_at": "2026-06-21T23:56:24-07:00",
+  "updated_at": "2026-06-22T00:17:54-07:00",
   "git_branch": "epic/1-markus-live-shared-review",
   "affected_files": [
     {
@@ -41,9 +41,6 @@
   ],
   "verify_command": "docker compose config \u0026\u0026 sprout doctor",
   "consecutive_failures": 0,
-  "claimed_by": "codex",
-  "claimed_at": "2026-06-21T23:47:54-07:00",
-  "lease_expires_at": "2026-06-22T01:17:54-07:00",
   "agent_notes": [
     {
       "timestamp": "2026-06-21T23:54:46-07:00",
@@ -161,8 +158,19 @@
       "timestamp": "2026-06-21T23:56:24-07:00",
       "kind": "verified",
       "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-22T00:17:15-07:00",
+      "kind": "updated",
+      "description": "Task updated"
+    },
+    {
+      "timestamp": "2026-06-22T00:17:54-07:00",
+      "kind": "released",
+      "description": "Task lease released"
     }
   ],
+  "summary": "Scaffolded the self-hosted MarkUS PocketBase service with Docker Compose, migrations, public hook routes, deployment notes, and backup/restore docs.",
   "dependencies": [
     {
       "id": "351a7d94-6121-4aa0-923c-6005a6b64324",

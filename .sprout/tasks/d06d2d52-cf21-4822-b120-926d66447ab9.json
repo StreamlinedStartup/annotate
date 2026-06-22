@@ -1,13 +1,13 @@
 {
   "id": "d06d2d52-cf21-4822-b120-926d66447ab9",
-  "revision": 8,
+  "revision": 10,
   "title": "Add shared threads and solution marker UI",
   "description": "Update the comments panel to expose live shared thread states, Open/Solutions/Resolved/All filters, solution markers for comments and replies, explicit offline draft copy, and browser tests for the expected UI behavior.",
-  "status": "in-progress",
+  "status": "done",
   "priority": "high",
   "epic_number": 1,
   "created_at": "2026-06-21T22:52:38-07:00",
-  "updated_at": "2026-06-21T23:38:21-07:00",
+  "updated_at": "2026-06-22T00:17:54-07:00",
   "git_branch": "epic/1-markus-live-shared-review",
   "affected_files": [
     {
@@ -21,9 +21,6 @@
   ],
   "verify_command": "bunx playwright test --project=chromium tests/annotate.spec.js",
   "consecutive_failures": 0,
-  "claimed_by": "codex",
-  "claimed_at": "2026-06-21T23:32:39-07:00",
-  "lease_expires_at": "2026-06-22T00:32:39-07:00",
   "agent_notes": [
     {
       "timestamp": "2026-06-21T23:26:59-07:00",
@@ -90,8 +87,19 @@
       "timestamp": "2026-06-21T23:38:21-07:00",
       "kind": "verified",
       "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-22T00:17:15-07:00",
+      "kind": "updated",
+      "description": "Task updated"
+    },
+    {
+      "timestamp": "2026-06-22T00:17:54-07:00",
+      "kind": "released",
+      "description": "Task lease released"
     }
   ],
+  "summary": "Implemented shared thread filters, solution markers for comments and replies, compact solution action styling, reply layout fixes, and Playwright coverage.",
   "dependencies": [
     {
       "id": "4e8639ec-3c9b-4ce1-b32e-dfabee04cdde",
