@@ -2,7 +2,7 @@ function markusPublicApi(e) {
   function setCors(origin) {
     e.response.header().set("Vary", "Origin");
     e.response.header().set("Access-Control-Allow-Origin", origin || "*");
-    e.response.header().set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+    e.response.header().set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
     e.response.header().set("Access-Control-Allow-Headers", "Content-Type, X-Markus-Public-Key, Authorization");
     e.response.header().set("Access-Control-Allow-Private-Network", "true");
     e.response.header().set("Access-Control-Max-Age", "600");
@@ -219,6 +219,18 @@ function markusPublicApi(e) {
     return e.json(200, { "comment": exportThread(comment) });
   }
 
+  function deleteComment(reviewId, commentId) {
+    var scope = requireSession(reviewId);
+    var comment = e.app.findRecordById("review_comments", commentId);
+    if (comment.getString("session") !== scope.session.id || comment.getBool("deleted")) {
+      throw new NotFoundError("Comment not found.");
+    }
+
+    comment.set("deleted", true);
+    e.app.save(comment);
+    return e.json(200, { "deletedId": comment.id });
+  }
+
   function setSolution(reviewId, body) {
     var scope = requireSession(reviewId);
     var targetType = cleanText(body.targetType, 16);
@@ -309,6 +321,9 @@ function markusPublicApi(e) {
     if (e.request.method === "PATCH" && parts.length === 4 && parts[2] === "comments") {
       return updateComment(reviewId, parts[3], body);
     }
+    if (e.request.method === "DELETE" && parts.length === 4 && parts[2] === "comments") {
+      return deleteComment(reviewId, parts[3]);
+    }
     if (e.request.method === "POST" && parts.length === 5 && parts[2] === "comments" && parts[4] === "replies") {
       return createReply(reviewId, parts[3], body);
     }
@@ -323,4 +338,5 @@ function markusPublicApi(e) {
 routerAdd("GET", "/api/markus/v1/{path...}", markusPublicApi);
 routerAdd("POST", "/api/markus/v1/{path...}", markusPublicApi);
 routerAdd("PATCH", "/api/markus/v1/{path...}", markusPublicApi);
+routerAdd("DELETE", "/api/markus/v1/{path...}", markusPublicApi);
 routerAdd("OPTIONS", "/api/markus/v1/{path...}", markusPublicApi);

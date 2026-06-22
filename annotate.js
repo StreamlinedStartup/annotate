@@ -165,7 +165,8 @@
   // localStorage key holding this project's entire comment blob
   var STORE_KEY = "annotate:" + (CFG.project || location.host || "default");
   var LIVE_DRAFT_KEY = STORE_KEY + ":live-drafts:" + (CFG.reviewId || "local") + ":" + PAGE;
-  var liveEvents = null;
+  var livePollTimer = null;
+  var liveSyncInFlight = false;
   function dbRead() {
     var d;
     try { d = JSON.parse(store.get(STORE_KEY) || "null"); } catch (e) { d = null; }
@@ -218,11 +219,11 @@
         author: r.author || "Anonymous",
         text: String(r.text || "").slice(0, 5000),
         solution: !!r.solution,
-        createdAt: r.createdAt || new Date().toISOString(),
+        createdAt: r.createdAt || r.created || new Date().toISOString(),
       };
     });
-    copy.createdAt = copy.createdAt || new Date().toISOString();
-    copy.updatedAt = copy.updatedAt || copy.createdAt;
+    copy.createdAt = copy.createdAt || copy.created || new Date().toISOString();
+    copy.updatedAt = copy.updatedAt || copy.updated || copy.createdAt;
     return copy;
   }
   function liveCommentPayload(comment) {
@@ -252,7 +253,8 @@
     if (body) opts.body = JSON.stringify(body);
     return fetch(liveUrl(path), opts).then(function (res) {
       if (!res.ok) throw new Error("Live review request failed: " + res.status);
-      return res.json();
+      if (res.status === 204) return {};
+      return res.text().then(function (text) { return text ? JSON.parse(text) : {}; });
     });
   }
   function setLiveStatus(status) {
@@ -262,21 +264,26 @@
   function liveListPath() {
     return "/comments?pageKey=" + encodeURIComponent(PAGE);
   }
-  function syncLiveList() {
+  function syncLiveList(options) {
     if (!CFG.live.enabled) return;
-    setLiveStatus("connecting");
+    if (liveSyncInFlight) return;
+    liveSyncInFlight = true;
+    options = options || {};
+    if (!options.quiet) setLiveStatus("connecting");
+    function done() { liveSyncInFlight = false; }
     liveRequest("GET", liveListPath()).then(function (data) {
       var incoming = Array.isArray(data) ? data : (data.threads || data.comments || []);
-      state.comments = mergeLiveDrafts(incoming.map(normalizeComment));
+      state.comments = mergeLiveDrafts(incoming.map(normalizeComment))
+        .filter(function (c) { return !pendingDeletes[c.id]; });
       state.liveStatus = "online";
       renderAll();
       renderPanel();
     }).catch(function () {
       state.liveStatus = liveDrafts().length ? "offline" : "unavailable";
-      state.comments = mergeLiveDrafts([]);
+      if (!options.quiet) state.comments = mergeLiveDrafts([]);
       renderAll();
       renderPanel();
-    });
+    }).then(done, done);
   }
   function syncLiveCreate(comment) {
     liveRequest("POST", "/comments", liveCommentPayload(comment)).then(function (data) {
@@ -329,26 +336,8 @@
     });
   }
   function subscribeLive() {
-    if (!CFG.live.enabled || !CFG.realtime || liveEvents || typeof EventSource === "undefined") return;
-    var url = liveUrl("/events?page=" + encodeURIComponent(PAGE) + "&publicKey=" + encodeURIComponent(CFG.publicKey));
-    try {
-      liveEvents = new EventSource(url);
-      liveEvents.onmessage = function (evt) {
-        var data;
-        try { data = JSON.parse(evt.data); } catch (e) { return; }
-        if (data.comment) {
-          mergeComment(normalizeComment(data.comment));
-          renderAll();
-          renderPanel();
-        }
-        if (data.deletedId) {
-          state.comments = state.comments.filter(function (c) { return c.id !== data.deletedId; });
-          renderAll();
-          renderPanel();
-        }
-      };
-      liveEvents.onerror = function () { state.liveStatus = "unavailable"; renderPanel(); };
-    } catch (e) {}
+    if (!CFG.live.enabled || !CFG.realtime) return;
+    if (!livePollTimer) livePollTimer = setInterval(function () { syncLiveList({ quiet: true }); }, 2500);
   }
   function uid() {
     if (window.crypto && crypto.getRandomValues) {

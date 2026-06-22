@@ -847,7 +847,8 @@ test.describe('Framework integration pages', () => {
 // LIVE MARKUS MODE
 // ============================================================
 test.describe('Live MarkUS mode', () => {
-  async function routeLivePage(page, body = '') {
+  async function routeLivePage(page, body = '', options = {}) {
+    const realtime = options.realtime === true ? 'true' : 'false';
     await page.route('**/live-markus.html', route => route.fulfill({
       contentType: 'text/html',
       body: `<!doctype html>
@@ -862,7 +863,7 @@ test.describe('Live MarkUS mode', () => {
               data-review-id="launch-homepage-v3"
               data-api-base-url="http://localhost:4200"
               data-public-key="rvw_pub_test"
-              data-realtime="false"
+              data-realtime="${realtime}"
               data-start-open="true"
               defer></script>
           </body>
@@ -901,6 +902,64 @@ test.describe('Live MarkUS mode', () => {
     await expect(page.locator('.an-card')).toHaveCount(1);
     await expect(page.locator('.an-card')).toContainText('Shared live comment');
     await expect(page.locator('#__an_foot')).toContainText('Live shared review');
+  });
+
+  test('uses server-created timestamps instead of treating fetched comments as new', async ({ page }) => {
+    await routeLivePage(page);
+    const created = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    await page.route('**/api/markus/v1/reviews/launch-homepage-v3/comments**', route => {
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          threads: [{
+            id: 'srv_old_comment',
+            pageKey: 'live-markus:/live-markus',
+            pageUrl: 'http://127.0.0.1/live-markus',
+            annotationType: 'pin',
+            author: 'Live Reviewer',
+            text: 'Older live comment',
+            color: '#f59e0b',
+            geometry: { kind: 'pin', selector: 'body', x: 0.4, y: 0.2 },
+            resolved: false,
+            replies: [],
+            created,
+            updated: created,
+          }],
+        }),
+      });
+    });
+
+    await page.goto('/live-markus.html');
+    await expect(page.locator('.an-card[data-id="srv_old_comment"] .an-when')).toContainText(/10m ago|11m ago/);
+  });
+
+  test('polls live comments so another viewer update appears without reload', async ({ page }) => {
+    await routeLivePage(page, '', { realtime: true });
+    let reads = 0;
+    await page.route('**/api/markus/v1/reviews/launch-homepage-v3/comments**', route => {
+      reads += 1;
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          threads: reads < 2 ? [] : [{
+            id: 'srv_polled_comment',
+            pageKey: 'live-markus:/live-markus',
+            pageUrl: 'http://127.0.0.1/live-markus',
+            annotationType: 'pin',
+            author: 'Other Viewer',
+            text: 'Appeared through polling',
+            color: '#f59e0b',
+            geometry: { kind: 'pin', selector: 'body', x: 0.4, y: 0.2 },
+            resolved: false,
+            replies: [],
+            created: new Date().toISOString(),
+            updated: new Date().toISOString(),
+          }],
+        }),
+      });
+    });
+    await page.goto('/live-markus.html');
+    await expect(page.locator('.an-card[data-id="srv_polled_comment"]')).toContainText('Appeared through polling', { timeout: 5000 });
   });
 
   test('posts new comments to the live API and uses the saved record', async ({ page }) => {
@@ -957,6 +1016,51 @@ test.describe('Live MarkUS mode', () => {
     await expect(page.locator('.an-card')).toContainText('Save when back online');
     await expect(page.locator('.an-card')).toContainText('Offline draft');
     await expect(page.locator('#__an_foot')).toContainText('Offline draft');
+  });
+
+  test('persists live comment deletion after the undo window expires', async ({ page }) => {
+    await routeLivePage(page);
+    let deleteSeen = false;
+    await page.route('**/api/markus/v1/reviews/launch-homepage-v3/comments**', async route => {
+      const req = route.request();
+      if (req.method() === 'GET') {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            threads: [{
+              id: 'srv_delete_comment',
+              pageKey: 'live-markus:/live-markus',
+              pageUrl: 'http://127.0.0.1/live-markus',
+              annotationType: 'pin',
+              author: 'Live Reviewer',
+              text: 'Delete me remotely',
+              color: '#f59e0b',
+              geometry: { kind: 'pin', selector: 'body', x: 0.4, y: 0.2 },
+              resolved: false,
+              replies: [],
+              created: new Date().toISOString(),
+              updated: new Date().toISOString(),
+            }],
+          }),
+        });
+        return;
+      }
+      expect(req.method()).toBe('DELETE');
+      expect(req.url()).toContain('/comments/srv_delete_comment');
+      deleteSeen = true;
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ deletedId: 'srv_delete_comment' }),
+      });
+    });
+
+    await page.goto('/live-markus.html');
+    await expect(page.locator('.an-card[data-id="srv_delete_comment"]')).toBeVisible();
+    await page.evaluate(() => {
+      document.querySelector('.an-card[data-id="srv_delete_comment"] .an-mini.an-danger').click();
+    });
+    await expect(page.locator('.an-card[data-id="srv_delete_comment"]')).toHaveCount(0);
+    await expect.poll(() => deleteSeen, { timeout: 7000 }).toBe(true);
   });
 });
 
