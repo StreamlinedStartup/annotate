@@ -97,7 +97,7 @@
     comments: [],
     panelOpen: false,
     activeId: null,
-    filter: "open", // open | resolved | all
+    filter: "open", // open | solutions | resolved | all
     query: "",
     enabled: store.get("an-off") !== "1", // master on/off
     liveStatus: CFG.live.enabled ? "connecting" : "local",
@@ -209,7 +209,18 @@
     copy.anchor = copy.anchor || null;
     copy.geom = copy.geom || null;
     copy.resolved = !!copy.resolved;
+    copy.solution = !!copy.solution;
     if (!Array.isArray(copy.replies)) copy.replies = [];
+    copy.replies = copy.replies.map(function (r) {
+      r = r || {};
+      return {
+        id: r.id || uid(),
+        author: r.author || "Anonymous",
+        text: String(r.text || "").slice(0, 5000),
+        solution: !!r.solution,
+        createdAt: r.createdAt || new Date().toISOString(),
+      };
+    });
     copy.createdAt = copy.createdAt || new Date().toISOString();
     copy.updatedAt = copy.updatedAt || copy.createdAt;
     return copy;
@@ -383,11 +394,16 @@
       if (!liveComment) return null;
       if (typeof changes.text === "string") liveComment.text = changes.text.slice(0, 5000);
       if (typeof changes.resolved === "boolean") liveComment.resolved = changes.resolved;
+      if (typeof changes.solution === "boolean") liveComment.solution = changes.solution;
       if (typeof changes.color === "string") liveComment.color = changes.color;
       if (changes.reply) liveComment.replies.push(changes.reply);
       if (changes.editReply) {
         var lri = liveComment.replies.findIndex(function (r) { return r.id === changes.editReply.id; });
         if (lri >= 0) liveComment.replies[lri] = Object.assign({}, liveComment.replies[lri], { text: changes.editReply.text });
+      }
+      if (changes.solutionReply) {
+        var lsri = liveComment.replies.findIndex(function (r) { return r.id === changes.solutionReply.id; });
+        if (lsri >= 0) liveComment.replies[lsri] = Object.assign({}, liveComment.replies[lsri], { solution: !!changes.solutionReply.solution });
       }
       if (changes.deleteReply) liveComment.replies = liveComment.replies.filter(function (r) { return r.id !== changes.deleteReply; });
       liveComment.updatedAt = new Date().toISOString();
@@ -400,11 +416,16 @@
     if (!c) return null;
     if (typeof changes.text === "string") c.text = changes.text.slice(0, 5000);
     if (typeof changes.resolved === "boolean") c.resolved = changes.resolved;
+    if (typeof changes.solution === "boolean") c.solution = changes.solution;
     if (typeof changes.color === "string") c.color = changes.color;
     if (changes.reply) c.replies.push(changes.reply);
     if (changes.editReply) {
       var ri = c.replies.findIndex(function (r) { return r.id === changes.editReply.id; });
       if (ri >= 0) { c.replies[ri] = Object.assign({}, c.replies[ri], { text: changes.editReply.text }); }
+    }
+    if (changes.solutionReply) {
+      var sri = c.replies.findIndex(function (r) { return r.id === changes.solutionReply.id; });
+      if (sri >= 0) { c.replies[sri] = Object.assign({}, c.replies[sri], { solution: !!changes.solutionReply.solution }); }
     }
     if (changes.deleteReply) {
       c.replies = c.replies.filter(function (r) { return r.id !== changes.deleteReply; });
@@ -675,6 +696,9 @@
   .an-rbadge { display:inline-flex; align-items:center; gap:3px; font:600 10px var(--an-font);
     color: var(--an-ok); }
   .an-rbadge svg { width:11px; height:11px; }
+  .an-sbadge { display:inline-flex; align-items:center; gap:3px; font:700 10px var(--an-font);
+    color: var(--an-btn-bg); }
+  .an-sbadge svg { width:11px; height:11px; }
   .an-quote { font-size:12px; color: var(--an-muted); background: var(--an-surface-2);
     border-left:3px solid var(--an-border-strong);
     padding:5px 9px; border-radius:0 6px 6px 0; margin:6px 0; line-height:1.45;
@@ -1667,7 +1691,7 @@
     });
     search.appendChild(searchInput);
     var filters = el("div", { class: "an-filters" });
-    [["open", "Open"], ["resolved", "Resolved"], ["all", "All"]].forEach(function (f) {
+    [["open", "Open"], ["solutions", "Solutions"], ["resolved", "Resolved"], ["all", "All"]].forEach(function (f) {
       var ch = el("span", { class: "an-chip" + (state.filter === f[0] ? " an-on" : ""), "data-f": f[0], text: f[1] });
       ch.addEventListener("click", function () {
         state.filter = f[0];
@@ -1944,9 +1968,13 @@
   }
 
   var TYPE_LABEL = { highlight: "Highlight", shape: "Shape", pin: "Pin", pen: "Sketch", note: "Note", block: "Section" };
+  function threadHasSolution(c) {
+    return !!(c && (c.solution || (c.replies || []).some(function (r) { return r.solution; })));
+  }
   function visibleComments() {
     return state.comments.filter(function (c) {
       if (state.filter === "open" && c.resolved) return false;
+      if (state.filter === "solutions" && !threadHasSolution(c)) return false;
       if (state.filter === "resolved" && !c.resolved) return false;
       if (state.query) {
         var hay = ((c.text || "") + " " + (c.author || "") + " " +
@@ -1967,6 +1995,8 @@
         ? "No comments match “" + esc(state.query) + "”."
         : state.filter === "resolved"
           ? "Nothing resolved yet."
+          : state.filter === "solutions"
+            ? "No solutions marked yet."
           : "No comments yet.<br>Select any text, or pick a tool from the toolbar — try <kbd>H</kbd> highlight or <kbd>P</kbd> pin.";
       listEl.appendChild(el("div", { class: "an-empty" }, [
         el("div", { class: "an-eicon", html: ICONS.bubble }),
@@ -1987,6 +2017,7 @@
 	          document.createTextNode("#" + idx + " " + (TYPE_LABEL[c.type] || c.type)),
 	        ]),
 	        c.livePending ? el("span", { class: "an-rbadge", html: ICONS.info + "<span>Offline draft</span>" }) : null,
+	        c.solution ? el("span", { class: "an-sbadge", html: ICONS.check + "<span>Solution</span>" }) : null,
 	        c.resolved ? el("span", { class: "an-rbadge", html: ICONS.check + "<span>Resolved</span>" }) : null,
 	        el("span", { class: "an-when", text: fmtTime(c.createdAt) }),
 	      ]);
@@ -1999,16 +2030,25 @@
       if (c.replies && c.replies.length) {
         var rep = el("div", { class: "an-replies" });
         c.replies.forEach(function (r) {
+          var replyText = el("span", { style: "flex:1;min-width:0" }, [
+            el("span", { class: "an-rwho", text: r.author }),
+            r.solution ? el("span", { class: "an-sbadge", html: ICONS.check + "<span>Solution</span>" }) : null,
+            document.createTextNode(r.text),
+            el("span", { class: "an-rwhen", text: fmtTime(r.createdAt) }),
+          ]);
           var replyRow = el("div", { class: "an-reply" }, [
             avatarEl(r.author, 18),
-            el("span", { style: "flex:1;min-width:0" }, [
-              el("span", { class: "an-rwho", text: r.author }),
-              document.createTextNode(r.text),
-              el("span", { class: "an-rwhen", text: fmtTime(r.createdAt) }),
-            ]),
+            replyText,
           ]);
+          var rAct = el("span", { style: "display:flex;gap:4px;flex:none;margin-left:6px;flex-wrap:wrap" });
+          var rSolution = el("button", { class: "an-mini", html: ICONS.check + "<span>" + (r.solution ? "Unmark solution" : "Mark solution") + "</span>" });
+          rSolution.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var updated = patchComment(c.id, { solutionReply: { id: r.id, solution: !r.solution } });
+            if (updated) { mergeComment(updated); renderPanel(); }
+          });
+          rAct.appendChild(rSolution);
           if (r.author === state.author) {
-            var rAct = el("span", { style: "display:flex;gap:4px;flex:none;margin-left:6px" });
             var rDel = el("button", { class: "an-mini an-danger", html: ICONS.trash, title: "Delete reply" });
             rDel.addEventListener("click", function (e) {
               e.stopPropagation();
@@ -2016,8 +2056,8 @@
               if (updated) { mergeComment(updated); renderPanel(); }
             });
             rAct.appendChild(rDel);
-            replyRow.appendChild(rAct);
           }
+          replyRow.appendChild(rAct);
           rep.appendChild(replyRow);
         });
         card.appendChild(rep);
@@ -2030,7 +2070,7 @@
       rbox.appendChild(rsend);
       function submitReply() {
         if (!rin.value.trim()) return;
-        var reply = { id: uid(), author: state.author || "Anonymous", text: rin.value.trim(), createdAt: new Date().toISOString() };
+        var reply = { id: uid(), author: state.author || "Anonymous", text: rin.value.trim(), solution: false, createdAt: new Date().toISOString() };
         var updated = patchComment(c.id, { reply: reply });
         if (updated) { rin.value = ""; mergeComment(updated); renderPanel(); }
       }
@@ -2065,6 +2105,11 @@
           e.stopPropagation();
           var updated = patchComment(c.id, { resolved: !c.resolved });
           if (updated) { mergeComment(updated); renderAll(); renderPanel(); }
+        } }),
+        el("button", { class: "an-mini", html: ICONS.check + "<span>" + (c.solution ? "Unmark solution" : "Mark solution") + "</span>", onclick: function (e) {
+          e.stopPropagation();
+          var updated = patchComment(c.id, { solution: !c.solution });
+          if (updated) { mergeComment(updated); renderPanel(); }
         } }),
         c.author === state.author ? el("button", { class: "an-mini", html: ICONS.edit + "<span>Edit</span>", onclick: function (e) {
           e.stopPropagation();

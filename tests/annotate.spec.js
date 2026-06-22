@@ -197,10 +197,11 @@ test.describe('Comments panel', () => {
   test('filter chips are visible', async ({ page }) => {
     await page.keyboard.press('a');
     const filters = page.locator('.an-chip');
-    await expect(filters).toHaveCount(3);
+    await expect(filters).toHaveCount(4);
     await expect(filters.nth(0)).toHaveText('Open');
-    await expect(filters.nth(1)).toHaveText('Resolved');
-    await expect(filters.nth(2)).toHaveText('All');
+    await expect(filters.nth(1)).toHaveText('Solutions');
+    await expect(filters.nth(2)).toHaveText('Resolved');
+    await expect(filters.nth(3)).toHaveText('All');
   });
 
   test('search filters comments', async ({ page }) => {
@@ -401,6 +402,37 @@ test.describe('Comment actions', () => {
     await expect(page.locator('.an-card')).toHaveCount(0); // still on Resolved filter
     await page.locator('.an-chip', { hasText: 'Open' }).click();
     await expect(page.locator('.an-card')).toHaveCount(1);
+  });
+
+  test('marks a top-level comment as a solution', async ({ page }) => {
+    const card = page.locator('.an-card').first();
+    await card.hover();
+    await card.locator('.an-mini', { hasText: 'Mark solution' }).click();
+
+    await expect(card.locator('.an-sbadge')).toContainText('Solution');
+    await page.locator('.an-chip', { hasText: 'Solutions' }).click();
+    await expect(page.locator('.an-card')).toHaveCount(1);
+    await expect(page.locator('.an-card')).toContainText('Initial comment');
+
+    await page.locator('.an-chip', { hasText: 'Open' }).click();
+    await expect(page.locator('.an-card')).toHaveCount(1);
+  });
+
+  test('marks a reply as a solution', async ({ page }) => {
+    const card = page.locator('.an-card').first();
+    await card.hover();
+    await card.locator('.an-mini', { hasText: 'Reply' }).click();
+    const replyInput = card.locator('.an-replybox .an-ta');
+    await replyInput.fill('Use this answer');
+    await card.locator('.an-replybox .an-primary').click();
+
+    const reply = card.locator('.an-reply').first();
+    await reply.locator('.an-mini', { hasText: 'Mark solution' }).click();
+
+    await expect(reply.locator('.an-sbadge')).toContainText('Solution');
+    await page.locator('.an-chip', { hasText: 'Solutions' }).click();
+    await expect(page.locator('.an-card')).toHaveCount(1);
+    await expect(page.locator('.an-card')).toContainText('Use this answer');
   });
 
   test('delete with undo', async ({ page }) => {
