@@ -1,33 +1,40 @@
-# reviewjs
+# MarkUS
 
-**A drop-in visual review & annotation layer for any website.** Highlight text,
-draw rectangles & circles, drop pins, sketch freehand and leave threaded
-comments — directly on top of your live page.
+**A drop-in visual review and annotation layer for any website.** MarkUS lets
+reviewers highlight text, draw shapes, place pins, sketch freehand, and leave
+threaded comments directly on top of a live page.
 
-No backend. No database. No tracking. Comments live in the visitor's own
-browser (`localStorage`) and can be **downloaded to / imported from a portable
-JSON file** to share with your team.
+MarkUS has two operating modes:
+
+- **Local-only mode:** add the script with no backend config. Comments stay in
+  the reviewer's browser `localStorage` and can be downloaded/imported as JSON.
+- **Live shared mode:** add a review id, MarkUS service URL, and public review
+  key. Comments, replies, resolved state, and solution markers sync through a
+  self-hosted PocketBase service.
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js" defer></script>
 ```
 
-That single line is the whole installation.
+That single line is enough for local-only reviews.
 
 ---
 
-## Why reviewjs?
+## Why MarkUS?
 
-- **One `<script>` tag.** No build step, no framework, no signup.
-- **Works everywhere.** Plain HTML, React, Vue, Svelte, WordPress, Webflow,
-  Shopify, static sites — anything that renders HTML in a browser.
-- **Local-first & private.** Every comment is stored on the reviewer's device.
-  Nothing is sent anywhere.
-- **Portable.** Reviewers export their feedback as JSON and send it to you; you
-  import it with one click and see every note in place.
-- **Polished UI.** A floating toolbar, a Figma-style comments panel, light/dark
-  themes that auto-adapt to your page, and full keyboard shortcuts.
-- **Tiny & dependency-free.** ~40 KB of vanilla JavaScript, zero dependencies.
+- **One script tag.** No build step, framework adapter, account, or vendor
+  service is required.
+- **Works anywhere.** Plain HTML, React, Vue, Svelte, WordPress, Webflow,
+  Shopify, static sites, and any browser-rendered app can load it.
+- **Local-first fallback.** Without live config, every comment stays private to
+  the reviewer's browser until they explicitly export or share it.
+- **Self-hosted live reviews.** Docker Compose starts the MarkUS PocketBase
+  service for shared threads, replies, solution markers, and future admin
+  exports.
+- **Reviewer-focused UI.** The toolbar, comments panel, filters, deep links,
+  download/import flow, and light/dark themes are injected without touching the
+  host app.
+- **Tiny and dependency-free client.** The browser layer is vanilla JavaScript.
 
 ---
 
@@ -35,137 +42,245 @@ That single line is the whole installation.
 
 | Tool | What it does |
 |------|--------------|
-| ✏️ **Highlight** | Select any text to highlight and comment on it |
-| ▭ **Rectangle** | Draw a box around any region |
-| ◯ **Circle** | Circle anything that needs attention |
-| 📍 **Pin** | Drop a point marker anywhere |
-| 〰️ **Freehand** | Sketch directly on the page |
-| ➕ **Section note** | Hover any paragraph/heading for a margin comment button |
+| Highlight | Select text to highlight and comment on it. |
+| Rectangle | Draw a box around any region. |
+| Circle | Circle anything that needs attention. |
+| Pin | Drop a point marker anywhere. |
+| Freehand | Sketch directly on the page. |
+| Section note | Hover configured blocks for a margin comment button. |
 
-Plus: threaded replies, resolve/reopen, search & filter, deep-links to a single
-comment (`#an=<id>`), an "off" mode that collapses to a small launcher, and a
-**Download / Import** round-trip for sharing.
+The comments panel supports threaded replies, resolve/reopen, Open / Solutions /
+Resolved / All filters, search, deep links to `#an=<id>`, solution markers on
+comments and replies, and JSON download/import.
 
 ---
 
-## Quick start
+## Quick Start
 
-### 1. The fastest way (CDN)
+### Local-only mode
 
-Add this just before `</body>`:
-
-```html
-<script src="https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js" defer></script>
-```
-
-That's it — reload the page and the toolbar appears in the bottom-right corner.
-
-> **Pin a version** for production stability:
-> `https://cdn.jsdelivr.net/npm/@reviewjs/annotate@1.0.1/annotate.js`
->
-> unpkg works too:
-> `https://unpkg.com/@reviewjs/annotate@1.0.1/annotate.js`
-
-### 2. Self-hosted
-
-Download [`annotate.js`](./annotate.js), drop it next to your HTML and:
+Add this before `</body>`:
 
 ```html
-<script src="/annotate.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js" defer></script>
 ```
+
+To pin a production version:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@markus/client@1.1.0/markus.js" defer></script>
+```
+
+Self-host the client by copying [`markus.js`](./markus.js) or
+[`annotate.js`](./annotate.js) next to your HTML:
+
+```html
+<script src="/markus.js" defer></script>
+```
+
+### Live shared mode
+
+Live mode is enabled only when all three live attributes are present:
+
+```html
+<script
+  src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js"
+  data-project="marketing-site"
+  data-page="/pricing"
+  data-review-id="launch-homepage-v3"
+  data-api-base-url="https://reviews.example.com"
+  data-public-key="rvw_pub_..."
+  defer
+></script>
+```
+
+In live mode, MarkUS fetches shared comments for the configured review and page,
+posts new comments/replies to the service, and keeps failed writes as explicit
+offline drafts in `localStorage`. It does not silently pretend an offline draft
+has been shared.
 
 ---
 
 ## Configuration
 
-Configure with `data-` attributes on the script tag — all optional:
+Configure with `data-` attributes on the script tag:
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js"
+  src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js"
   data-project="marketing-site"
+  data-page="/pricing"
   data-accent="#6d28d9"
   data-theme="auto"
   data-position="bottom-right"
   data-start-open="true"
-  data-note="Focus on the hero copy and pricing — flag anything off-brand."
+  data-note="Focus on the hero copy and pricing."
   data-share-email="reviews@example.com"
+  data-review-id="launch-homepage-v3"
+  data-api-base-url="https://reviews.example.com"
+  data-public-key="rvw_pub_..."
+  data-realtime="true"
   defer
 ></script>
 ```
 
 | Attribute | Default | Description |
 |-----------|---------|-------------|
-| `data-project` | `""` | Namespace for stored comments. Keep separate sites apart. |
+| `data-project` | `""` | Namespace/display label. Also separates local stored comments. |
 | `data-page` | `location.pathname` | Page key comments are grouped under. |
-| `data-accent` | — | Brand color for primary buttons & the active tool. |
-| `data-theme` | `auto` | `light`, `dark`, or `auto` (sniffs your page background). |
+| `data-accent` | MarkUS default | Brand color for primary buttons and the active tool. |
+| `data-theme` | `auto` | `light`, `dark`, or `auto`. |
 | `data-position` | `bottom-right` | `bottom-right` or `bottom-left`. |
-| `data-blocks` | sensible default | CSS selector for "section note" (+) targets. |
-| `data-start-open` | `false` | Set to `true` to show the review toolbar immediately instead of the collapsed Review pill. |
-| `data-note` | — | Author's note to reviewers — what should be reviewed. Shown when they start and atop the comments panel. |
-| `data-share-email` | — | Where reviewers send comments: an email address, or a Slack / Hangout link. Adds a **Share** button. |
+| `data-blocks` | sensible default | CSS selector for section-note targets. |
+| `data-start-open` | `false` | Set to `true` to show the toolbar immediately. |
+| `data-note` | `""` | Author note shown when reviewers start and atop the panel. |
+| `data-share-email` | `""` | Email address or chat URL used by the Share flow. |
+| `data-review-id` | `""` | Live review session slug. Required for live mode. |
+| `data-api-base-url` | `""` | MarkUS service origin, for example `https://reviews.example.com`. |
+| `data-public-key` | `""` | Public scoped key for this review session. Required for live mode. |
+| `data-realtime` | `true` | Set to `false` to disable EventSource live updates. |
 
-Prefer JS config? Set `window.AnnotateConfig` **before** the script loads:
+Prefer JavaScript config? Set `window.MarkUSConfig` before the script loads:
 
 ```html
 <script>
-  window.AnnotateConfig = {
+  window.MarkUSConfig = {
     project: "marketing-site",
+    page: "/pricing",
     accent: "#6d28d9",
-    theme: "auto",
-    note: "Focus on the hero copy and pricing — flag anything off-brand.",
-    shareEmail: "reviews@example.com",
+    reviewId: "launch-homepage-v3",
+    apiBaseUrl: "https://reviews.example.com",
+    publicKey: "rvw_pub_...",
   };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js" defer></script>
+```
+
+`window.AnnotateConfig` remains supported as a compatibility alias.
+
+---
+
+## Self-Hosted MarkUS Service
+
+The live backend scaffold lives in [`markus-service/`](./markus-service). It
+uses PocketBase for SQLite-backed persistence, file storage, an admin dashboard,
+and realtime-ready collections.
+
+Run it locally:
+
+```bash
+PB_ADMIN_EMAIL=admin@example.com \
+PB_ADMIN_PASSWORD=change-me-now \
+PB_ENCRYPTION="$(openssl rand -hex 16)" \
+docker compose up markus-pocketbase
+```
+
+PocketBase starts at `http://localhost:8090`; the admin dashboard is at
+`http://localhost:8090/_/`.
+
+Create a review session in the PocketBase admin UI:
+
+1. Add a `review_sessions` record with `slug`, `publicKey`, and `enabled=true`.
+2. Add a `review_origins` record for the browser origin that will embed MarkUS.
+3. Use the session slug as `data-review-id` and the public key as
+   `data-public-key`.
+
+The public service validates request `Origin`, `X-Markus-Public-Key`, enabled
+session state, and enabled origins before accepting public review actions.
+Public keys are scoped to review actions only; admin actions require PocketBase
+admin authentication and must never be exposed to the browser client.
+
+The service hook routes are:
+
+- `GET /api/markus/v1/health`
+- `GET /api/markus/v1/reviews/{reviewId}/comments?pageKey=/path`
+- `POST /api/markus/v1/reviews/{reviewId}/comments`
+- `PATCH /api/markus/v1/reviews/{reviewId}/comments/{commentId}`
+- `POST /api/markus/v1/reviews/{reviewId}/comments/{commentId}/replies`
+- `POST /api/markus/v1/reviews/{reviewId}/solutions`
+
+The current browser client live data layer enables from the same embed
+attributes and expects the configured service origin to provide the review API
+under the client route prefix. When pairing with the PocketBase scaffold, keep
+the reverse proxy/API prefix aligned with the deployed client version.
+
+### Reverse proxy
+
+Run the optional Caddy profile:
+
+```bash
+MARKUS_PROXY_FROM=reviews.example.com docker compose --profile proxy up -d
+```
+
+For production, terminate TLS at the proxy and keep PocketBase admin access
+restricted to trusted operators. Do not log public keys, admin credentials,
+comment bodies, screenshots, cookies, or full URLs with sensitive query
+strings.
+
+### Backup and restore
+
+Back up the PocketBase data volume before upgrades:
+
+```bash
+docker run --rm \
+  -v hartford_markus_pb_data:/pb_data:ro \
+  -v "$PWD":/backup \
+  alpine tar czf /backup/markus-pb-data.tgz -C /pb_data .
+```
+
+Restore into an empty data volume:
+
+```bash
+docker run --rm \
+  -v hartford_markus_pb_data:/pb_data \
+  -v "$PWD":/backup \
+  alpine sh -c 'tar xzf /backup/markus-pb-data.tgz -C /pb_data'
 ```
 
 ---
 
-## Framework integration
+## Agent Exports
 
-reviewjs is a plain browser script, so the goal everywhere is the same:
-**load `annotate.js` once, after the page has rendered.** Below are copy-paste
-recipes.
+Solution markers identify the comments or replies that reviewers want
+implemented. Agent-facing exports should prioritize solution-marked items while
+preserving the full surrounding thread, author, timestamps, resolved state,
+anchor/geometry data, and page context. Resolved and solution states are
+separate: resolved means the thread is closed; solution means the item is the
+intended implementation guidance.
 
-### ⚛️ React (and Next.js)
+Until admin export endpoints are added, reviewers can still use the panel
+Download action for a portable JSON bundle.
 
-Load it once at the app root with a `useEffect`:
+---
+
+## Framework Integration
+
+MarkUS is a plain browser script. Load it once after the page has rendered.
+
+### React and Next.js
 
 ```jsx
-// components/Annotate.jsx
 import { useEffect } from "react";
 
-export default function Annotate() {
+export default function MarkUSReview() {
   useEffect(() => {
-    if (document.getElementById("annotate-js")) return;
-    window.AnnotateConfig = { project: "my-react-app", accent: "#6d28d9" };
-    const s = document.createElement("script");
-    s.id = "annotate-js";
-    s.src = "https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js";
-    s.defer = true;
-    document.body.appendChild(s);
+    if (document.getElementById("markus-js")) return;
+    window.MarkUSConfig = {
+      project: "my-react-app",
+      accent: "#6d28d9",
+    };
+    const script = document.createElement("script");
+    script.id = "markus-js";
+    script.src = "https://cdn.jsdelivr.net/npm/@markus/client/markus.js";
+    script.defer = true;
+    document.body.appendChild(script);
   }, []);
+
   return null;
 }
 ```
 
-```jsx
-// App.jsx
-import Annotate from "./components/Annotate";
-
-export default function App() {
-  return (
-    <>
-      <Annotate />
-      {/* your app */}
-    </>
-  );
-}
-```
-
-**Next.js (App Router)** — drop the `<Script>` into `app/layout.js`:
+Next.js App Router:
 
 ```jsx
 import Script from "next/script";
@@ -176,7 +291,7 @@ export default function RootLayout({ children }) {
       <body>
         {children}
         <Script
-          src="https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js"
+          src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js"
           strategy="afterInteractive"
         />
       </body>
@@ -185,140 +300,71 @@ export default function RootLayout({ children }) {
 }
 ```
 
-### 🟩 Vue 3
+### Plain HTML, CMS, and site builders
 
-```vue
-<!-- App.vue -->
-<script setup>
-import { onMounted } from "vue";
-
-onMounted(() => {
-  if (document.getElementById("annotate-js")) return;
-  window.AnnotateConfig = { project: "my-vue-app", accent: "#10b981" };
-  const s = document.createElement("script");
-  s.id = "annotate-js";
-  s.src = "https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js";
-  s.defer = true;
-  document.body.appendChild(s);
-});
-</script>
-```
-
-Or, even simpler, add the `<script>` tag straight into `public/index.html`
-(Vue CLI) / `index.html` (Vite) before `</body>`.
-
-### 🧩 WordPress
-
-**Option A — no code.** Install a "header/footer scripts" plugin (e.g. *WPCode*
-or *Insert Headers and Footers*) and paste this into the **footer** box:
+Paste the script before `</body>` or into the platform's custom footer field:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js" data-project="my-wp-site" defer></script>
-```
-
-**Option B — theme code.** Add to your theme's `functions.php`:
-
-```php
-function reviewjs_enqueue() {
-  wp_enqueue_script(
-    'reviewjs',
-    'https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js',
-    array(),
-    '1.0.1',
-    true // load in footer
-  );
-}
-add_action( 'wp_enqueue_scripts', 'reviewjs_enqueue' );
-```
-
-> Tip: wrap the enqueue in `if ( current_user_can('edit_posts') )` to show the
-> review tools only to logged-in editors.
-
-### 🔷 Svelte / SvelteKit
-
-```svelte
-<!-- src/routes/+layout.svelte -->
-<script>
-  import { onMount } from "svelte";
-  onMount(() => {
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js";
-    s.defer = true;
-    document.body.appendChild(s);
-  });
-</script>
-
-<slot />
-```
-
-### 🅰️ Angular
-
-In `angular.json`, add to the `"scripts"` array:
-
-```json
-"scripts": [
-  "https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js"
-]
-```
-
-### 🌐 Plain HTML / static sites / Webflow / Shopify / Squarespace
-
-Paste before `</body>` (or into the platform's "custom code / footer" field):
-
-```html
-<script src="https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js" defer></script>
+<script
+  src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js"
+  data-project="website-review"
+  defer
+></script>
 ```
 
 ---
 
-## Sharing comments
+## Sharing Local Comments
 
-Because everything is local, sharing is an explicit, privacy-friendly action:
+In local-only mode, sharing is explicit:
 
-1. A reviewer opens the **Comments panel** (toolbar list icon or press `A`).
-2. They click **Download** (⬇) to save a `annotate-<page>-<date>.json` file.
-3. They send you that file.
-4. You open the same page, click **Import** (⬆), pick the file — every comment
-   reappears anchored in place.
+1. Open the Comments panel.
+2. Click Download to save a `annotate-<page>-<date>.json` file.
+3. Send the file to the person collecting feedback.
+4. They open the same page, click Import, and select the file.
 
-You can also drive this from code (see the API below).
+Live shared mode removes that manual round trip for configured review sessions,
+but JSON download/import remains available as a fallback.
 
 ---
 
 ## JavaScript API
 
-A global `window.Annotate` is available once the script loads:
+`window.MarkUS` is the canonical API. `window.Annotate` is the compatibility
+alias and points to the same object.
 
 ```js
-Annotate.open();              // show the review layer and open the comments panel
-Annotate.close();
-Annotate.toggle();
-Annotate.enable();            // show the review layer
-Annotate.disable();           // collapse to the launcher
-Annotate.setTool("highlight");// show the layer, then choose cursor | highlight | rect | circle | pen | pin
-Annotate.comments();          // → array of comment objects for this page
-Annotate.focus(id);           // scroll to & highlight a comment
-Annotate.export();            // trigger the JSON download
-Annotate.import();            // open the file picker
-Annotate.clear();             // delete all comments on this page (local)
-Annotate.toast("Saved!");     // show a toast
-Annotate.version;             // "1.0.1"
+MarkUS.open();              // show the review layer and open the comments panel
+MarkUS.close();
+MarkUS.toggle();
+MarkUS.enable();            // show the review layer
+MarkUS.disable();           // collapse to the launcher
+MarkUS.setTool("highlight");// cursor | highlight | rect | circle | pen | pin
+MarkUS.comments();          // array of comment objects for this page
+MarkUS.focus(id);           // scroll to and highlight a comment
+MarkUS.export();            // trigger JSON download
+MarkUS.import();            // open the file picker
+MarkUS.clear();             // delete all local comments on this page
+MarkUS.toast("Saved!");     // show a toast
+MarkUS.version;             // package version
+MarkUS.config;              // resolved configuration, including live.enabled
 ```
 
 ### Comment shape
 
 ```json
 {
-  "id": "c…",
+  "id": "c...",
   "page": "marketing-site:/pricing",
   "url": "https://example.com/pricing",
   "type": "highlight",
   "author": "Jane Doe",
   "text": "This price looks out of date.",
   "color": "#f59e0b",
-  "anchor": { "exact": "…", "prefix": "…", "suffix": "…" },
+  "anchor": { "exact": "...", "prefix": "...", "suffix": "..." },
   "geom": null,
   "resolved": false,
+  "solution": false,
   "replies": [],
   "createdAt": "2026-06-16T10:00:00.000Z",
   "updatedAt": "2026-06-16T10:00:00.000Z"
@@ -327,39 +373,39 @@ Annotate.version;             // "1.0.1"
 
 ---
 
-## Keyboard shortcuts
+## Keyboard Shortcuts
 
 | Key | Action | Key | Action |
 |-----|--------|-----|--------|
 | `V` | Browse | `P` | Pin |
 | `H` | Highlight | `A` | Comments panel |
-| `R` | Rectangle | `O` | Show / hide tools |
+| `R` | Rectangle | `O` | Show or hide tools |
 | `C` | Circle | `Esc` | Cancel |
 | `D` | Freehand | `?` | Shortcuts card |
 
 ---
 
-## Try it locally
+## Try It Locally
 
 ```bash
 git clone git@github.com:reviewjs/annotate.git
 cd annotate
-npm start          # serves the demo at http://localhost:3000
+bun install
+bun run start
 ```
 
-Open [`index.html`](./index.html) and start annotating. Framework examples live
-in [`examples/`](./examples).
+The demo serves at `http://localhost:4200`. Framework examples live in
+[`examples/`](./examples).
 
 ---
 
-## Browser support
+## Browser Support
 
-Modern evergreen browsers (Chrome, Edge, Firefox, Safari). Uses standard DOM
-APIs only — no polyfills required. Gracefully no-ops where `localStorage` is
-unavailable (private mode, sandboxed iframes).
+Modern evergreen browsers: Chrome, Edge, Firefox, and Safari. MarkUS uses
+standard DOM APIs and gracefully no-ops where `localStorage` is unavailable.
 
 ---
 
 ## License
 
-[MIT](./LICENSE) — free for personal and commercial use.
+[MIT](./LICENSE)

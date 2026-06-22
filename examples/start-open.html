@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>annotate.js — start-open demo</title>
+  <title>MarkUS — start-open demo</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 740px; margin: 0 auto; padding: 40px 24px; color: #1f2328; background: #f7f1e5; }
     header.hero h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 16px; }
@@ -15,22 +15,25 @@
 <body>
 
 <header class="hero">
-  <h1>Review this page — toolbar is open by default</h1>
+  <h1>Review this page with MarkUS</h1>
   <p class="lead">This example uses <code>data-start-open="true"</code> so the toolbar appears immediately without the reviewer having to click the review bubble first.</p>
 </header>
 
 <section>
   <h2>Content to review</h2>
   <p>Select text, press <kbd>R</kbd> to draw a rectangle, or press <kbd>P</kbd> to drop a pin on any element.</p>
-  <p>The panel is intentionally closed on startup — the reviewer can open it with <kbd>A</kbd> or by clicking the comments icon.</p>
+  <p>The panel is intentionally closed on startup. The reviewer can open it with <kbd>A</kbd> or by clicking the comments icon.</p>
 </section>
 
 <script
-  src="/annotate.js"
-  data-project="annotate-demo"
+  src="/markus.js"
+  data-project="markus-demo"
   data-accent="#6d28d9"
   data-theme="auto"
   data-start-open="true"
+  data-review-id="launch-homepage-v3"
+  data-api-base-url="http://localhost:8090"
+  data-public-key="rvw_pub_local"
   defer
 ></script>
 </body>

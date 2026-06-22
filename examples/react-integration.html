@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>annotate.js — React integration test</title>
+  <title>MarkUS — React integration test</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #fafafa; }
     h1 { font-size: 2rem; margin-bottom: 1rem; }
@@ -28,14 +28,14 @@
       const [items] = useState([
         'Annotate any React component tree',
         'Works with React Router and Next.js',
-        'No re-render interference — annotate.js is external to React',
+        'No re-render interference because MarkUS is external to React',
         'Annotations persist across React state changes',
       ]);
 
       return React.createElement('div', null,
-        React.createElement('h1', null, 'React Integration Test'),
+        React.createElement('h1', null, 'MarkUS React Integration Test'),
         React.createElement('p', null,
-          'This page renders via React 18. The annotate.js toolbar should appear bottom-right ' +
+          'This page renders via React 18. The MarkUS toolbar should appear bottom-right ' +
           'and survive React re-renders and state changes without breaking.'
         ),
         React.createElement('div', { className: 'card' },
@@ -59,7 +59,15 @@
     root.render(React.createElement(App));
   </script>
 
-  <!-- annotate.js loaded AFTER React mounts -->
-  <script src="../annotate.js" data-project="react-test" defer></script>
+  <!-- MarkUS loaded after React mounts. Remove the live attributes for local-only JSON export/import reviews. -->
+  <script
+    src="../markus.js"
+    data-project="react-test"
+    data-page="/examples/react-integration"
+    data-review-id="launch-homepage-v3"
+    data-api-base-url="http://localhost:8090"
+    data-public-key="rvw_pub_local"
+    defer
+  ></script>
 </body>
 </html>

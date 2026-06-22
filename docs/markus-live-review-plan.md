@@ -6,6 +6,13 @@ Rename the product layer to **MarkUS**: a punny “mark us up” feedback layer.
 
 The browser script remains a static CDN asset, while live storage, realtime updates, admin controls, and exports are handled by a **self-hosted PocketBase-backed MarkUS service** deployed with Docker Compose.
 
+Current implementation status:
+- MarkUS naming is present in package metadata, `markus.js`, and the canonical `window.MarkUS` API alias.
+- The browser client enters live mode when `data-review-id`, `data-api-base-url`, and `data-public-key` are all present.
+- The comments panel has Open / Solutions / Resolved / All filters and solution markers for comments and replies.
+- The PocketBase service scaffold, collections, migrations, Docker Compose service, optional Caddy profile, and public hook routes are present.
+- Admin exports and full PocketBase realtime subscriptions remain planned follow-up work; JSON download/import remains the portable fallback.
+
 Embed model:
 
 ```html
@@ -44,6 +51,7 @@ Chosen defaults:
   - Add MarkUS collections/migrations for review sessions, allowed origins, comments, replies, solution markers, and optional screenshot files.
   - Add PocketBase server hooks where collection rules alone are not enough, especially for public-key validation, origin checks, rate limiting, sanitization, and export shaping.
   - Store data in mounted Docker volumes.
+  - Keep direct public collection rules closed; expose public review actions only through MarkUS hook routes.
 
 - Add Docker Compose starter:
   - `markus-pocketbase`
@@ -57,6 +65,7 @@ Chosen defaults:
   - New comments/replies are created through scoped public endpoints.
   - Other visitors receive PocketBase realtime updates and see shared threads without reload.
   - localStorage becomes offline/draft cache and reviewer identity storage, not the source of truth in live mode.
+  - Current client-side offline behavior stores failed writes as explicit offline drafts and displays that state in the UI.
 
 - Add “solution” markers:
   - A solution can point to the original comment or one/more replies.
@@ -100,13 +109,26 @@ Chosen defaults:
   - `data-realtime`: optional, default `true`.
   - `data-project`: optional display/grouping label.
   - `data-page`: optional explicit page key; defaults to current path.
+  - Equivalent JavaScript config lives on `window.MarkUSConfig`; `window.AnnotateConfig` remains a compatibility alias.
+
+- Public PocketBase hook routes:
+  - `GET /api/markus/v1/health`
+  - `GET /api/markus/v1/reviews/{reviewId}/comments?pageKey=/path`
+  - `POST /api/markus/v1/reviews/{reviewId}/comments`
+  - `PATCH /api/markus/v1/reviews/{reviewId}/comments/{commentId}`
+  - `POST /api/markus/v1/reviews/{reviewId}/comments/{commentId}/replies`
+  - `POST /api/markus/v1/reviews/{reviewId}/solutions`
+
+- Endpoint alignment note:
+  - The checked-in browser live data layer enables from the live embed attributes and expects the configured service origin to provide the review API under the client route prefix used by that client version.
+  - When deploying the PocketBase scaffold, align the reverse proxy/API prefix with the deployed client before exposing live review sessions.
 
 - MarkUS client operations:
   - list page comments
   - create comment
   - update comment text/status
   - create reply
-  - update reply text
+  - update reply text/status
   - add/remove solution marker
   - export review bundle for Codex/admin use
 
@@ -143,12 +165,26 @@ Chosen defaults:
   - replies,
   - solution badge/buttons on each comment/reply,
   - live updates without closing drafts.
+- Solution markers are independent from resolved state.
 - If the backend is unavailable:
   - show “Offline draft” state,
   - queue pending writes locally,
   - retry explicitly,
   - offer JSON download fallback,
   - never silently pretend a comment was shared.
+
+## Documentation / Examples
+
+- The top-level README documents:
+  - MarkUS naming and `@markus/client` script usage.
+  - Local-only mode as the unchanged no-backend fallback.
+  - Live shared embed attributes.
+  - Docker Compose service startup, session/origin setup, reverse proxy, backup/restore, and admin security.
+  - Agent export expectations around solution markers.
+- Examples cover:
+  - Plain HTML live embed.
+  - `data-start-open` live embed.
+  - React integration that loads MarkUS once after React mounts.
 
 ## Test Plan
 
