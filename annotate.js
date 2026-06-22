@@ -166,6 +166,7 @@
   var STORE_KEY = "annotate:" + (CFG.project || location.host || "default");
   var LIVE_DRAFT_KEY = STORE_KEY + ":live-drafts:" + (CFG.reviewId || "local") + ":" + PAGE;
   var livePollTimer = null;
+  var liveRealtime = null;
   var liveSyncInFlight = false;
   function dbRead() {
     var d;
@@ -264,6 +265,23 @@
   function liveListPath() {
     return "/comments?pageKey=" + encodeURIComponent(PAGE);
   }
+  function realtimeUrl() {
+    return CFG.apiBaseUrl + "/api/realtime";
+  }
+  function realtimeTopic() {
+    return "review_comments/*?options=" + encodeURIComponent(JSON.stringify({
+      query: { pageKey: PAGE, publicKey: CFG.publicKey },
+    }));
+  }
+  function subscribeRealtime(clientId) {
+    return fetch(realtimeUrl(), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ clientId: clientId, subscriptions: [realtimeTopic()] }),
+    }).then(function (res) {
+      if (!res.ok && res.status !== 204) throw new Error("Realtime subscription failed: " + res.status);
+    });
+  }
   function syncLiveList(options) {
     if (!CFG.live.enabled) return;
     if (liveSyncInFlight) return;
@@ -337,7 +355,36 @@
   }
   function subscribeLive() {
     if (!CFG.live.enabled || !CFG.realtime) return;
-    if (!livePollTimer) livePollTimer = setInterval(function () { syncLiveList({ quiet: true }); }, 2500);
+    if (liveRealtime || typeof EventSource === "undefined") {
+      if (!livePollTimer) livePollTimer = setInterval(function () { syncLiveList({ quiet: true }); }, 2500);
+      return;
+    }
+    liveRealtime = new EventSource(realtimeUrl());
+    liveRealtime.addEventListener("PB_CONNECT", function (ev) {
+      var data;
+      try { data = JSON.parse(ev.data || "{}"); } catch (e) { data = {}; }
+      if (!data.clientId) return;
+      subscribeRealtime(data.clientId).then(function () {
+        state.liveStatus = "online";
+        renderPanel();
+      }).catch(function () {
+        if (liveRealtime) liveRealtime.close();
+        liveRealtime = null;
+        if (!livePollTimer) livePollTimer = setInterval(function () { syncLiveList({ quiet: true }); }, 2500);
+      });
+    });
+    function onRealtimeEvent(ev) {
+      var data;
+      try { data = JSON.parse(ev.data || "{}"); } catch (e) { data = {}; }
+      if (data.action || data.record) syncLiveList({ quiet: true });
+    }
+    liveRealtime.addEventListener("message", onRealtimeEvent);
+    liveRealtime.addEventListener("review_comments/*", onRealtimeEvent);
+    liveRealtime.onerror = function () {
+      state.liveStatus = liveDrafts().length ? "offline" : "unavailable";
+      renderPanel();
+      if (!livePollTimer) livePollTimer = setInterval(function () { syncLiveList({ quiet: true }); }, 2500);
+    };
   }
   function uid() {
     if (window.crypto && crypto.getRandomValues) {
@@ -1555,6 +1602,7 @@
     openComposer(e.clientX + 6, e.clientY + 6, { type: d.tool === "pen" ? "pen" : "shape", color: state.color, geom: geom });
   }
   var SEMANTIC_TAGS = /^(MAIN|ARTICLE|SECTION|ASIDE|HEADER|FOOTER|NAV)$/;
+  var ANCHOR_TAGS = /^(A|BUTTON|INPUT|TEXTAREA|SELECT|LABEL|SUMMARY|IMG|VIDEO|CANVAS|SVG)$/;
   var CONTAINER_CLASSES = /\b(container|wrap(?:per)?|content|layout|inner|page)\b/;
   function pickAnchor(target) {
     var n = target;
@@ -1562,8 +1610,9 @@
       if (isOurs(n)) { n = n.parentElement; continue; }
       var hasId = !!n.id;
       var isSemantic = SEMANTIC_TAGS.test(n.nodeName);
+      var isControl = ANCHOR_TAGS.test(n.nodeName) || (n.getAttribute && n.getAttribute("role") === "button");
       var isContainer = n.classList && CONTAINER_CLASSES.test(n.className);
-      if (hasId || isSemantic || isContainer) {
+      if (hasId || isSemantic || isContainer || isControl) {
         var r = n.getBoundingClientRect();
         if (r.width > 80 && r.height > 40) return n;
       }

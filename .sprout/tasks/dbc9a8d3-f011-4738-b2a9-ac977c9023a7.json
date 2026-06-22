@@ -1,0 +1,109 @@
+{
+  "id": "dbc9a8d3-f011-4738-b2a9-ac977c9023a7",
+  "revision": 8,
+  "title": "Fix live comment sync and responsive annotation placement",
+  "description": "Use PocketBase realtime-compatible updates for live comments and anchor shape geometry so desktop rectangles map correctly on responsive mobile layouts.",
+  "status": "done",
+  "priority": "high",
+  "created_at": "2026-06-22T10:08:28-07:00",
+  "updated_at": "2026-06-22T10:17:39-07:00",
+  "git_branch": "sprout/dbc9a8d3",
+  "affected_files": [
+    {
+      "path": "annotate.js",
+      "reason": "live sync client and responsive geometry anchoring"
+    },
+    {
+      "path": "tests/annotate.spec.js",
+      "reason": "regression coverage for realtime and responsive geometry"
+    },
+    {
+      "path": "markus-service/pb_hooks/markus_public_api.pb.js",
+      "reason": "public realtime event endpoint if required"
+    },
+    {
+      "path": "markus-service/pb_migrations/1782086400_markus_initial_schema.js",
+      "reason": "collection API rule updates if required"
+    },
+    {
+      "path": "README.md",
+      "reason": "live realtime behavior documentation"
+    },
+    {
+      "path": "markus-service/pb_migrations/1782172800_markus_realtime_comment_rule.js",
+      "reason": "apply realtime comment list rule to existing PocketBase deployments"
+    }
+  ],
+  "doc_refs": [
+    {
+      "ref": "docs/markus-live-review-plan.md",
+      "required": false
+    }
+  ],
+  "doc_reason": "assess existing live review plan before changing behavior",
+  "verify_command": "bun run test -- --project=chromium",
+  "consecutive_failures": 0,
+  "agent_notes": [
+    {
+      "timestamp": "2026-06-22T10:14:09-07:00",
+      "author": "agent",
+      "kind": "decision",
+      "content": "Use PocketBase native /api/realtime for browser live updates. The client subscribes to review_comments/* with pageKey and publicKey query options, then refreshes the scoped public thread list when comment events arrive. Shape annotations now prefer concrete controls such as buttons as geometry anchors so responsive mobile layouts reposition rectangles with the target element instead of the page body."
+    }
+  ],
+  "events": [
+    {
+      "timestamp": "2026-06-22T10:08:28-07:00",
+      "kind": "created",
+      "description": "Task created"
+    },
+    {
+      "timestamp": "2026-06-22T10:08:35-07:00",
+      "kind": "started",
+      "description": "Task started",
+      "metadata": {
+        "agent": "codex"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T10:13:58-07:00",
+      "kind": "scope_touched",
+      "description": "Affected file scope updated",
+      "metadata": {
+        "reason": "apply realtime comment list rule to existing PocketBase deployments"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T10:14:09-07:00",
+      "kind": "note_added",
+      "description": "Agent note added",
+      "metadata": {
+        "author": "agent",
+        "kind": "decision"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T10:15:59-07:00",
+      "kind": "updated",
+      "description": "Task updated"
+    },
+    {
+      "timestamp": "2026-06-22T10:16:03-07:00",
+      "kind": "verify_failed",
+      "description": "Failed tests found in ///Users/vulturestudio/node_modules/serve/build/main.js:246: [WebServer]     throw new Error(",
+      "metadata": {
+        "kind": "test_failure"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T10:17:21-07:00",
+      "kind": "verified",
+      "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-22T10:17:39-07:00",
+      "kind": "completed",
+      "description": "Task marked done"
+    }
+  ]
+}

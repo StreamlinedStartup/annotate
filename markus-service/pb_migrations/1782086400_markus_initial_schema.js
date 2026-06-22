@@ -47,7 +47,7 @@ migrate((app) => {
   const comments = new Collection({
     type: "base",
     name: "review_comments",
-    listRule: null,
+    listRule: "session.publicKey = @request.query.publicKey && pageKey = @request.query.pageKey && deleted = false",
     viewRule: null,
     createRule: null,
     updateRule: null,

@@ -124,9 +124,9 @@ API tokens, or passwords. Treat it as an unguessable scoped review capability:
 rotate it by replacing `review_sessions.publicKey` and updating the embed.
 
 In live mode, MarkUS fetches shared comments for the configured review and page,
-posts new comments/replies to the service, and keeps failed writes as explicit
-offline drafts in `localStorage`. It does not silently pretend an offline draft
-has been shared.
+opens PocketBase realtime through `/api/realtime`, posts new comments/replies
+to the service, and keeps failed writes as explicit offline drafts in
+`localStorage`. It does not silently pretend an offline draft has been shared.
 
 ---
 
@@ -247,6 +247,11 @@ The service hook routes are:
 - `PATCH /api/markus/v1/reviews/{reviewId}/comments/{commentId}`
 - `POST /api/markus/v1/reviews/{reviewId}/comments/{commentId}/replies`
 - `POST /api/markus/v1/reviews/{reviewId}/solutions`
+
+Realtime updates use PocketBase's native `GET /api/realtime` SSE connection and
+`POST /api/realtime` subscription handshake. MarkUS subscribes to
+`review_comments/*` with the configured `pageKey` and public review key, then
+refreshes the scoped thread list when comment events arrive.
 
 The current browser client live data layer enables from the same embed
 attributes and expects the configured service origin to provide the review API

@@ -933,8 +933,28 @@ test.describe('Live MarkUS mode', () => {
     await expect(page.locator('.an-card[data-id="srv_old_comment"] .an-when')).toContainText(/10m ago|11m ago/);
   });
 
-  test('polls live comments so another viewer update appears without reload', async ({ page }) => {
+  test('subscribes to PocketBase realtime so another viewer update appears without reload', async ({ page }) => {
     await routeLivePage(page, '', { realtime: true });
+    await page.addInitScript(() => {
+      window.__markusEventSources = [];
+      window.EventSource = class FakeEventSource {
+        constructor(url) {
+          this.url = url;
+          this.listeners = {};
+          window.__markusEventSources.push(this);
+        }
+        addEventListener(type, callback) {
+          if (!this.listeners[type]) this.listeners[type] = [];
+          this.listeners[type].push(callback);
+        }
+        close() {
+          this.closed = true;
+        }
+        dispatch(type, data) {
+          (this.listeners[type] || []).forEach(callback => callback({ data: JSON.stringify(data) }));
+        }
+      };
+    });
     let reads = 0;
     await page.route('**/api/markus/v1/reviews/launch-homepage-v3/comments**', route => {
       reads += 1;
@@ -947,7 +967,7 @@ test.describe('Live MarkUS mode', () => {
             pageUrl: 'http://127.0.0.1/live-markus',
             annotationType: 'pin',
             author: 'Other Viewer',
-            text: 'Appeared through polling',
+            text: 'Appeared through realtime',
             color: '#f59e0b',
             geometry: { kind: 'pin', selector: 'body', x: 0.4, y: 0.2 },
             resolved: false,
@@ -958,8 +978,32 @@ test.describe('Live MarkUS mode', () => {
         }),
       });
     });
+    let realtimeSubscription;
+    await page.route('**/api/realtime', async route => {
+      const req = route.request();
+      if (req.method() !== 'POST') {
+        await route.continue();
+        return;
+      }
+      realtimeSubscription = req.postDataJSON();
+      await route.fulfill({ status: 204, body: '' });
+    });
     await page.goto('/live-markus.html');
-    await expect(page.locator('.an-card[data-id="srv_polled_comment"]')).toContainText('Appeared through polling', { timeout: 5000 });
+    await page.waitForFunction(() => window.__markusEventSources && window.__markusEventSources.length === 1);
+    const realtimeUrl = await page.evaluate(() => window.__markusEventSources[0].url);
+    expect(realtimeUrl).toBe('http://localhost:4200/api/realtime');
+    await page.evaluate(() => {
+      window.__markusEventSources[0].dispatch('PB_CONNECT', { clientId: 'client_1' });
+    });
+    await expect.poll(() => realtimeSubscription, { timeout: 3000 }).toBeTruthy();
+    expect(realtimeSubscription.clientId).toBe('client_1');
+    expect(realtimeSubscription.subscriptions[0]).toContain('review_comments/*');
+    expect(decodeURIComponent(realtimeSubscription.subscriptions[0])).toContain('"pageKey":"live-markus:/live-markus"');
+    expect(decodeURIComponent(realtimeSubscription.subscriptions[0])).toContain('"publicKey":"rvw_pub_test"');
+    await page.evaluate(() => {
+      window.__markusEventSources[0].dispatch('message', { action: 'create', record: { id: 'srv_realtime_comment' } });
+    });
+    await expect(page.locator('.an-card[data-id="srv_polled_comment"]')).toContainText('Appeared through realtime', { timeout: 3000 });
   });
 
   test('posts new comments to the live API and uses the saved record', async ({ page }) => {
@@ -1302,6 +1346,77 @@ test.describe('Architectural improvements', () => {
     });
     expect(geom).toBeTruthy();
     expect(typeof geom.vw).toBe('number');
+  });
+
+  test('rectangles drawn on responsive buttons anchor to the button instead of the page body', async ({ page }) => {
+    await page.route('**/responsive-anchor.html', route => route.fulfill({
+      contentType: 'text/html',
+      body: `<!doctype html>
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <style>
+              body { margin: 0; font-family: system-ui, sans-serif; }
+              main { display: grid; gap: 32px; max-width: 980px; margin: 0 auto; padding: 48px 24px 220px; }
+              .hero { min-height: 720px; display: grid; align-content: start; gap: 18px; }
+              .target-button { width: 560px; min-height: 96px; border: 0; border-radius: 8px; background: #155eef; color: white; font: 700 22px system-ui; }
+              @media (max-width: 640px) {
+                main { padding: 24px 16px 80px; }
+                .hero { min-height: 180px; }
+                .target-button { width: 100%; min-height: 104px; order: -1; }
+              }
+            </style>
+          </head>
+          <body>
+            <main>
+              <section class="hero">
+                <h1>Responsive target</h1>
+                <p>The desktop layout pushes the call to action far down the page.</p>
+                <button class="target-button">Large bottom button</button>
+              </section>
+            </main>
+            <script src="/markus.js" data-project="responsive-anchor" data-page="/responsive-anchor" data-start-open="true" defer></script>
+          </body>
+        </html>`,
+    }));
+
+    await page.setViewportSize({ width: 1000, height: 900 });
+    await page.goto('/responsive-anchor.html');
+    await clearStorage(page);
+    await page.reload();
+    await setName(page);
+    await page.keyboard.press('r');
+    const desktopButton = await page.locator('.target-button').boundingBox();
+    await dispatchPointerStroke(
+      page,
+      desktopButton.x + 80,
+      desktopButton.y + 24,
+      desktopButton.x + desktopButton.width - 80,
+      desktopButton.y + desktopButton.height - 20
+    );
+    await page.locator('#__an_compose textarea').fill('Responsive button rectangle');
+    await page.locator('#__an_compose .an-primary').click();
+
+    const geom = await page.evaluate(() => window.MarkUS.comments()[0].geom);
+    expect(geom.selector).toContain('button');
+    expect(geom.selector).not.toBe('body');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await setName(page);
+    await expect(page.locator('rect.an-hit')).toHaveCount(1);
+    const alignment = await page.evaluate(() => {
+      const button = document.querySelector('.target-button').getBoundingClientRect();
+      const rect = document.querySelector('rect.an-hit').getBoundingClientRect();
+      return {
+        rectTop: rect.top,
+        rectBottom: rect.bottom,
+        buttonTop: button.top,
+        buttonBottom: button.bottom,
+      };
+    });
+    expect(alignment.rectTop).toBeGreaterThanOrEqual(alignment.buttonTop - 4);
+    expect(alignment.rectBottom).toBeLessThanOrEqual(alignment.buttonBottom + 4);
   });
 
   test('viewport-mismatch badge appears on pin drawn at very different width', async ({ page }) => {
