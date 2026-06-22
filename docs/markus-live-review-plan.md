@@ -10,7 +10,7 @@ Current implementation status:
 - MarkUS naming is present in package metadata, `markus.js`, and the canonical `window.MarkUS` API alias.
 - The browser client enters live mode when `data-review-id`, `data-api-base-url`, and `data-public-key` are all present.
 - The comments panel has Open / Solutions / Resolved / All filters and solution markers for comments and replies.
-- The PocketBase service scaffold, collections, migrations, Docker Compose service, optional Caddy profile, and public hook routes are present.
+- The PocketBase service scaffold, collections, migrations, Docker Compose service, and public hook routes are present.
 - Admin exports and full PocketBase realtime subscriptions remain planned follow-up work; JSON download/import remains the portable fallback.
 
 Embed model:
@@ -55,7 +55,6 @@ Chosen defaults:
 
 - Add Docker Compose starter:
   - `markus-pocketbase`
-  - optional `caddy` reverse proxy for TLS
   - persistent volumes for PocketBase data and uploaded screenshots
   - environment variables for public base URL, admin bootstrap settings, signing/public-key secrets, allowed origins, SMTP, upload limits, retention, and rate limits
   - documented backup/restore commands for the PocketBase data volume
@@ -179,7 +178,7 @@ Chosen defaults:
   - MarkUS naming and `@vulture916/markus` script usage.
   - Local-only mode as the unchanged no-backend fallback.
   - Live shared embed attributes.
-  - Docker Compose service startup, session/origin setup, reverse proxy, backup/restore, and admin security.
+  - Docker Compose service startup, session/origin setup, external TLS proxy guidance, backup/restore, and admin security.
   - Agent export expectations around solution markers.
 - Examples cover:
   - Plain HTML live embed.
@@ -192,7 +191,7 @@ Chosen defaults:
   - `docker compose up` starts MarkUS/PocketBase from a clean checkout.
   - Healthcheck passes after PocketBase is ready and migrations are applied.
   - Persistent volumes survive container restart.
-  - Reverse-proxy/TLS docs include headers/settings needed for PocketBase realtime.
+  - External proxy/TLS docs include headers/settings needed for PocketBase realtime.
 
 - Security/API tests:
   - Reject unknown origins, invalid public keys, disabled sessions, oversized payloads, malformed geometry, and unauthorized exports.

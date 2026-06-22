@@ -106,11 +106,9 @@ curl -sS http://localhost:8090/api/markus/v1/reviews/launch-homepage-v3/comments
 
 ## Deployment Notes
 
-Run the optional reverse proxy profile with:
-
-```bash
-MARKUS_PROXY_FROM=reviews.example.com docker compose --profile proxy up -d
-```
+The Compose file only runs PocketBase. For production, terminate TLS in your
+own proxy or hosting platform and keep PocketBase admin access restricted to
+trusted operators.
 
 Back up the service data volume before upgrades:
 

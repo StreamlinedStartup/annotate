@@ -240,21 +240,16 @@ The service hook routes are:
 
 The current browser client live data layer enables from the same embed
 attributes and expects the configured service origin to provide the review API
-under the client route prefix. When pairing with the PocketBase scaffold, keep
-the reverse proxy/API prefix aligned with the deployed client version.
+under the client route prefix. When exposing the PocketBase scaffold beyond
+local development, put it behind your platform's TLS proxy and keep the API
+origin aligned with the deployed client version.
 
 ### Reverse proxy
 
-Run the optional Caddy profile:
-
-```bash
-MARKUS_PROXY_FROM=reviews.example.com docker compose --profile proxy up -d
-```
-
-For production, terminate TLS at the proxy and keep PocketBase admin access
-restricted to trusted operators. Do not log public keys, admin credentials,
-comment bodies, screenshots, cookies, or full URLs with sensitive query
-strings.
+The Compose file only runs PocketBase. For production, terminate TLS in your
+own proxy or hosting platform and keep PocketBase admin access restricted to
+trusted operators. Do not log public keys, admin credentials, comment bodies,
+screenshots, cookies, or full URLs with sensitive query strings.
 
 ### Backup and restore
 

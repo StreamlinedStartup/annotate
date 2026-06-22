@@ -29,30 +29,5 @@ services:
       timeout: 5s
       retries: 10
 
-  caddy:
-    image: caddy:2.8-alpine
-    container_name: markus-caddy
-    profiles:
-      - proxy
-    restart: unless-stopped
-    depends_on:
-      markus-pocketbase:
-        condition: service_healthy
-    command:
-      - caddy
-      - reverse-proxy
-      - --from
-      - ${MARKUS_PROXY_FROM:-reviews.example.com}
-      - --to
-      - markus-pocketbase:8090
-    ports:
-      - "${MARKUS_HTTP_PORT:-80}:80"
-      - "${MARKUS_HTTPS_PORT:-443}:443"
-    volumes:
-      - markus_caddy_data:/data
-      - markus_caddy_config:/config
-
 volumes:
   markus_pb_data:
-  markus_caddy_data:
-  markus_caddy_config:
