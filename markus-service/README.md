@@ -20,7 +20,10 @@ image entrypoint creates or updates the superuser from `PB_ADMIN_EMAIL` and
 `PB_ADMIN_PASSWORD` before serving, but only when the command is empty or starts
 with a flag.
 
-PocketBase does not publish an official Docker image. The Compose file pins the community `ghcr.io/muchobien/pocketbase:0.39.4` image and mounts committed migrations/hooks into the container.
+PocketBase does not publish an official Docker image. The Compose file builds
+from the pinned community `ghcr.io/muchobien/pocketbase:0.39.4` image and copies
+the committed migrations/hooks into the container image so Coolify does not need
+host bind mounts.
 
 ## Collections
 

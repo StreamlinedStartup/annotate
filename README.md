@@ -213,6 +213,10 @@ image entrypoint creates or updates the superuser from `PB_ADMIN_EMAIL` and
 `PB_ADMIN_PASSWORD` before serving, but only when the command is empty or starts
 with a flag.
 
+The service image is built from `markus-service/Dockerfile` so the committed
+PocketBase migrations and hooks are copied into the container image. This avoids
+depending on host bind mounts in Coolify.
+
 Create a review session in the PocketBase admin UI:
 
 1. Generate a public review key:
