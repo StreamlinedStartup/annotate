@@ -1,0 +1,180 @@
+{
+  "id": "ec953807-60c9-4ba5-b0af-e498dd2a6d85",
+  "revision": 17,
+  "title": "Scaffold self-hosted PocketBase service",
+  "description": "Add the v1 MarkUS PocketBase service scaffold with collections/migrations, public review endpoint hooks, scoped origin/public-key validation, rate-limit and sanitization placeholders, Docker Compose deployment, and service-level verification.",
+  "status": "done",
+  "priority": "medium",
+  "epic_number": 1,
+  "created_at": "2026-06-21T22:52:43-07:00",
+  "updated_at": "2026-06-22T00:17:54-07:00",
+  "git_branch": "epic/1-markus-live-shared-review",
+  "affected_files": [
+    {
+      "path": "docker-compose.yml",
+      "reason": "self-hosted MarkUS and optional reverse proxy deployment"
+    },
+    {
+      "path": "markus-service/pb_migrations",
+      "reason": "PocketBase collection schema migrations"
+    },
+    {
+      "path": "markus-service/pb_hooks",
+      "reason": "PocketBase hooks for scoped public review APIs"
+    },
+    {
+      "path": "markus-service/README.md",
+      "reason": "service-specific setup and verification notes"
+    },
+    {
+      "path": "markus-service",
+      "reason": "parent directory for scoped PocketBase migrations, hooks, and service README"
+    },
+    {
+      "path": "markus-service/pb_hooks/markus_public_api.pb.js",
+      "reason": "PocketBase hook implementation for scoped public MarkUS review API"
+    },
+    {
+      "path": "markus-service/pb_migrations/1782086400_markus_initial_schema.js",
+      "reason": "PocketBase migration defining v1 MarkUS review collections"
+    }
+  ],
+  "verify_command": "docker compose config \u0026\u0026 sprout doctor",
+  "consecutive_failures": 0,
+  "agent_notes": [
+    {
+      "timestamp": "2026-06-21T23:54:46-07:00",
+      "author": "agent",
+      "kind": "decision",
+      "content": "Keep PocketBase collection rules closed to public users and expose MarkUS visitor access only through custom /api/markus/v1 hooks so review id, public key, and origin validation are enforced server-side."
+    },
+    {
+      "timestamp": "2026-06-21T23:55:28-07:00",
+      "author": "agent",
+      "kind": "observation",
+      "content": "Docker-backed PocketBase migration check passed with ghcr.io/muchobien/pocketbase:0.39.4 and applied 1782086400_markus_initial_schema.js."
+    }
+  ],
+  "events": [
+    {
+      "timestamp": "2026-06-21T22:52:43-07:00",
+      "kind": "created",
+      "description": "Task created"
+    },
+    {
+      "timestamp": "2026-06-21T22:52:43-07:00",
+      "kind": "assigned_to_epic",
+      "description": "Task assigned to epic",
+      "metadata": {
+        "epic": "1"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T22:53:09-07:00",
+      "kind": "updated",
+      "description": "Task updated"
+    },
+    {
+      "timestamp": "2026-06-21T23:47:54-07:00",
+      "kind": "started",
+      "description": "Task started",
+      "metadata": {
+        "agent": "codex"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T23:52:40-07:00",
+      "kind": "verify_failed",
+      "description": "Verification blocked by file drift"
+    },
+    {
+      "timestamp": "2026-06-21T23:52:47-07:00",
+      "kind": "scope_touched",
+      "description": "Affected file scope updated",
+      "metadata": {
+        "reason": "parent directory for scoped PocketBase migrations, hooks, and service README"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T23:52:51-07:00",
+      "kind": "verified",
+      "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-21T23:53:32-07:00",
+      "kind": "verified",
+      "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-21T23:54:46-07:00",
+      "kind": "note_added",
+      "description": "Agent note added",
+      "metadata": {
+        "author": "agent",
+        "kind": "decision"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T23:55:24-07:00",
+      "kind": "verified",
+      "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-21T23:55:28-07:00",
+      "kind": "note_added",
+      "description": "Agent note added",
+      "metadata": {
+        "author": "agent",
+        "kind": "observation"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T23:55:53-07:00",
+      "kind": "verify_failed",
+      "description": "Verification blocked by file drift"
+    },
+    {
+      "timestamp": "2026-06-21T23:55:59-07:00",
+      "kind": "scope_touched",
+      "description": "Affected file scope updated",
+      "metadata": {
+        "reason": "PocketBase hook implementation for scoped public MarkUS review API"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T23:55:59-07:00",
+      "kind": "scope_touched",
+      "description": "Affected file scope updated",
+      "metadata": {
+        "reason": "PocketBase migration defining v1 MarkUS review collections"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T23:56:05-07:00",
+      "kind": "verified",
+      "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-21T23:56:24-07:00",
+      "kind": "verified",
+      "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-22T00:17:15-07:00",
+      "kind": "updated",
+      "description": "Task updated"
+    },
+    {
+      "timestamp": "2026-06-22T00:17:54-07:00",
+      "kind": "released",
+      "description": "Task lease released"
+    }
+  ],
+  "summary": "Scaffolded the self-hosted MarkUS PocketBase service with Docker Compose, migrations, public hook routes, deployment notes, and backup/restore docs.",
+  "dependencies": [
+    {
+      "id": "351a7d94-6121-4aa0-923c-6005a6b64324",
+      "type": "blocks_start"
+    }
+  ]
+}

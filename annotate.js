@@ -1,9 +1,9 @@
 /* =============================================================================
- * annotate.js — a drop-in visual review & annotation layer for any website.
+ * markus.js / annotate.js — a drop-in visual review & annotation layer.
  * Open-source edition · local-only · zero backend.
  *
  * Load with a single <script> tag:
- *   <script src="https://cdn.jsdelivr.net/npm/reviewjs/annotate.js" defer></script>
+ *   <script src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js" defer></script>
  *
  * Comments are stored in the visitor's own browser (localStorage) and can be
  * exported to / imported from a portable JSON file — no server, no database,
@@ -20,7 +20,7 @@
  *   data-note      author's note to reviewers — what should be reviewed
  *   data-share-email  where reviewers send comments: an email address, or a
  *                     Slack / Hangout (chat) link
- * …or via `window.AnnotateConfig = { project, page, … }` before the script.
+ * …or via `window.MarkUSConfig = { project, page, … }` before the script.
  *
  * Tools: text highlight, rectangle, circle, pin, freehand ink and section
  * notes — each carries a threaded comment.
@@ -42,9 +42,9 @@
   // then a global window.AnnotateConfig object, then built-in defaults.
   // --------------------------------------------------------------------------
   var SCRIPT = document.currentScript ||
-    document.querySelector('script[src*="annotate"]');
+    document.querySelector('script[src*="markus"], script[src*="annotate"]');
   var scriptData = (SCRIPT && SCRIPT.dataset) || {};   // data-* attributes
-  var globalConfig = window.AnnotateConfig || {};       // window.AnnotateConfig
+  var globalConfig = window.MarkUSConfig || window.AnnotateConfig || {};
   var CFG = {
     project: scriptData.project || globalConfig.project || "",
     page: scriptData.page || globalConfig.page || location.pathname,
@@ -55,6 +55,16 @@
     startOpen: truthy(scriptData.startOpen || globalConfig.startOpen),
     note: scriptData.note || globalConfig.note || "",
     share: String(scriptData.shareEmail || globalConfig.shareEmail || "").trim(),
+    reviewId: String(scriptData.reviewId || globalConfig.reviewId || "").trim(),
+    apiBaseUrl: String(scriptData.apiBaseUrl || globalConfig.apiBaseUrl || "").replace(/\/+$/, ""),
+    publicKey: String(scriptData.publicKey || globalConfig.publicKey || "").trim(),
+    realtime: String(scriptData.realtime || globalConfig.realtime || "true").toLowerCase() !== "false",
+  };
+  CFG.live = {
+    enabled: !!(CFG.reviewId && CFG.apiBaseUrl && CFG.publicKey),
+    reviewId: CFG.reviewId,
+    apiBaseUrl: CFG.apiBaseUrl,
+    realtime: CFG.realtime,
   };
   var PAGE = (CFG.project ? CFG.project + ":" : "") + CFG.page;
 
@@ -87,9 +97,10 @@
     comments: [],
     panelOpen: false,
     activeId: null,
-    filter: "open", // open | resolved | all
+    filter: "open", // open | solutions | resolved | all
     query: "",
     enabled: store.get("an-off") !== "1", // master on/off
+    liveStatus: CFG.live.enabled ? "connecting" : "local",
   };
 
   // --------------------------------------------------------------------------
@@ -153,6 +164,8 @@
   // --------------------------------------------------------------------------
   // localStorage key holding this project's entire comment blob
   var STORE_KEY = "annotate:" + (CFG.project || location.host || "default");
+  var LIVE_DRAFT_KEY = STORE_KEY + ":live-drafts:" + (CFG.reviewId || "local") + ":" + PAGE;
+  var liveEvents = null;
   function dbRead() {
     var d;
     try { d = JSON.parse(store.get(STORE_KEY) || "null"); } catch (e) { d = null; }
@@ -161,6 +174,182 @@
     return d;
   }
   function dbWrite(d) { store.set(STORE_KEY, JSON.stringify(d)); }
+  function liveDrafts() {
+    var d;
+    try { d = JSON.parse(store.get(LIVE_DRAFT_KEY) || "[]"); } catch (e) { d = []; }
+    return Array.isArray(d) ? d : [];
+  }
+  function writeLiveDrafts(items) { store.set(LIVE_DRAFT_KEY, JSON.stringify(items || [])); }
+  function saveLiveDraft(comment) {
+    var items = liveDrafts().filter(function (c) { return c.id !== comment.id; });
+    items.push(comment);
+    writeLiveDrafts(items);
+  }
+  function removeLiveDraft(id) {
+    writeLiveDrafts(liveDrafts().filter(function (c) { return c.id !== id; }));
+  }
+  function mergeLiveDrafts(remote) {
+    var seen = {};
+    remote.forEach(function (c) { seen[c.id] = true; });
+    return remote.concat(liveDrafts().filter(function (c) { return !seen[c.id]; }));
+  }
+  function sanitizedUrl() {
+    return location.origin + location.pathname + location.search;
+  }
+  function normalizeComment(c) {
+    c = c || {};
+    var copy = Object.assign({}, c);
+    copy.id = copy.id || uid();
+    copy.page = copy.page || PAGE;
+    copy.url = copy.url || sanitizedUrl();
+    copy.type = copy.type || "note";
+    copy.author = copy.author || "Anonymous";
+    copy.text = String(copy.text || "").slice(0, 5000);
+    copy.color = copy.color || state.color;
+    copy.anchor = copy.anchor || null;
+    copy.geom = copy.geom || null;
+    copy.resolved = !!copy.resolved;
+    copy.solution = !!copy.solution;
+    if (!Array.isArray(copy.replies)) copy.replies = [];
+    copy.replies = copy.replies.map(function (r) {
+      r = r || {};
+      return {
+        id: r.id || uid(),
+        author: r.author || "Anonymous",
+        text: String(r.text || "").slice(0, 5000),
+        solution: !!r.solution,
+        createdAt: r.createdAt || new Date().toISOString(),
+      };
+    });
+    copy.createdAt = copy.createdAt || new Date().toISOString();
+    copy.updatedAt = copy.updatedAt || copy.createdAt;
+    return copy;
+  }
+  function liveCommentPayload(comment) {
+    var copy = JSON.parse(JSON.stringify(comment));
+    delete copy.livePending;
+    delete copy.liveError;
+    copy.page = PAGE;
+    copy.url = sanitizedUrl();
+    return copy;
+  }
+  function liveUrl(path) {
+    return CFG.apiBaseUrl + "/api/reviews/" + encodeURIComponent(CFG.reviewId) + path;
+  }
+  function liveRequest(method, path, body) {
+    var opts = {
+      method: method,
+      headers: {
+        "content-type": "application/json",
+        "x-markus-public-key": CFG.publicKey,
+      },
+    };
+    if (body) opts.body = JSON.stringify(body);
+    return fetch(liveUrl(path), opts).then(function (res) {
+      if (!res.ok) throw new Error("Live review request failed: " + res.status);
+      return res.json();
+    });
+  }
+  function setLiveStatus(status) {
+    state.liveStatus = status;
+    renderPanel();
+  }
+  function liveListPath() {
+    return "/comments?page=" + encodeURIComponent(PAGE);
+  }
+  function syncLiveList() {
+    if (!CFG.live.enabled) return;
+    setLiveStatus("connecting");
+    liveRequest("GET", liveListPath()).then(function (data) {
+      var incoming = Array.isArray(data) ? data : (data.comments || []);
+      state.comments = mergeLiveDrafts(incoming.map(normalizeComment));
+      state.liveStatus = "online";
+      renderAll();
+      renderPanel();
+    }).catch(function () {
+      state.liveStatus = liveDrafts().length ? "offline" : "unavailable";
+      state.comments = mergeLiveDrafts([]);
+      renderAll();
+      renderPanel();
+    });
+  }
+  function syncLiveCreate(comment) {
+    liveRequest("POST", "/comments", {
+      reviewId: CFG.reviewId,
+      page: PAGE,
+      publicKey: CFG.publicKey,
+      comment: liveCommentPayload(comment),
+    }).then(function (data) {
+      var saved = normalizeComment(data.comment || data);
+      removeLiveDraft(comment.id);
+      state.comments = state.comments.filter(function (c) { return c.id !== comment.id; });
+      mergeComment(saved);
+      state.activeId = saved.id;
+      state.liveStatus = "online";
+      renderAll();
+      renderPanel();
+    }).catch(function () {
+      comment.livePending = true;
+      comment.liveError = "offline";
+      saveLiveDraft(comment);
+      state.liveStatus = "offline";
+      renderPanel();
+      toast("Offline draft saved locally. Retry when the review service is available.", { kind: "error", duration: 7000 });
+    });
+  }
+  function syncLivePatch(id, changes, updated) {
+    if (updated.livePending) { saveLiveDraft(updated); return; }
+    liveRequest("PATCH", "/comments/" + encodeURIComponent(id), {
+      reviewId: CFG.reviewId,
+      page: PAGE,
+      changes: changes,
+    }).then(function (data) {
+      mergeComment(normalizeComment(data.comment || data || updated));
+      state.liveStatus = "online";
+      renderAll();
+      renderPanel();
+    }).catch(function () {
+      updated.livePending = true;
+      updated.liveError = "offline";
+      saveLiveDraft(updated);
+      state.liveStatus = "offline";
+      renderPanel();
+    });
+  }
+  function syncLiveDelete(id) {
+    liveRequest("DELETE", "/comments/" + encodeURIComponent(id), {
+      reviewId: CFG.reviewId,
+      page: PAGE,
+    }).then(function () {
+      state.liveStatus = "online";
+      renderPanel();
+    }).catch(function () {
+      state.liveStatus = "offline";
+      renderPanel();
+    });
+  }
+  function subscribeLive() {
+    if (!CFG.live.enabled || !CFG.realtime || liveEvents || typeof EventSource === "undefined") return;
+    var url = liveUrl("/events?page=" + encodeURIComponent(PAGE) + "&publicKey=" + encodeURIComponent(CFG.publicKey));
+    try {
+      liveEvents = new EventSource(url);
+      liveEvents.onmessage = function (evt) {
+        var data;
+        try { data = JSON.parse(evt.data); } catch (e) { return; }
+        if (data.comment) {
+          mergeComment(normalizeComment(data.comment));
+          renderAll();
+          renderPanel();
+        }
+        if (data.deletedId) {
+          state.comments = state.comments.filter(function (c) { return c.id !== data.deletedId; });
+          renderAll();
+          renderPanel();
+        }
+      };
+      liveEvents.onerror = function () { state.liveStatus = "unavailable"; renderPanel(); };
+    } catch (e) {}
+  }
   function uid() {
     if (window.crypto && crypto.getRandomValues) {
       var arr = new Uint32Array(3);
@@ -170,10 +359,11 @@
     return "c" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
   }
   function pageComments() {
+    if (CFG.live.enabled) return liveDrafts();
     return dbRead().comments.filter(function (c) { return c.page === PAGE; });
   }
   function createComment(draft) {
-    var d = dbRead(), now = new Date().toISOString();
+    var d = CFG.live.enabled ? null : dbRead(), now = new Date().toISOString();
     var c = {
       id: uid(),
       page: PAGE,
@@ -189,20 +379,53 @@
       createdAt: now,
       updatedAt: now,
     };
+    if (CFG.live.enabled) {
+      c.livePending = true;
+      saveLiveDraft(c);
+      syncLiveCreate(c);
+      return c;
+    }
     d.comments.push(c); dbWrite(d);
     return c;
   }
   function patchComment(id, changes) {
+    if (CFG.live.enabled) {
+      var liveComment = state.comments.filter(function (x) { return x.id === id; })[0];
+      if (!liveComment) return null;
+      if (typeof changes.text === "string") liveComment.text = changes.text.slice(0, 5000);
+      if (typeof changes.resolved === "boolean") liveComment.resolved = changes.resolved;
+      if (typeof changes.solution === "boolean") liveComment.solution = changes.solution;
+      if (typeof changes.color === "string") liveComment.color = changes.color;
+      if (changes.reply) liveComment.replies.push(changes.reply);
+      if (changes.editReply) {
+        var lri = liveComment.replies.findIndex(function (r) { return r.id === changes.editReply.id; });
+        if (lri >= 0) liveComment.replies[lri] = Object.assign({}, liveComment.replies[lri], { text: changes.editReply.text });
+      }
+      if (changes.solutionReply) {
+        var lsri = liveComment.replies.findIndex(function (r) { return r.id === changes.solutionReply.id; });
+        if (lsri >= 0) liveComment.replies[lsri] = Object.assign({}, liveComment.replies[lsri], { solution: !!changes.solutionReply.solution });
+      }
+      if (changes.deleteReply) liveComment.replies = liveComment.replies.filter(function (r) { return r.id !== changes.deleteReply; });
+      liveComment.updatedAt = new Date().toISOString();
+      if (liveComment.livePending) saveLiveDraft(liveComment);
+      syncLivePatch(id, changes, liveComment);
+      return liveComment;
+    }
     var d = dbRead();
     var c = d.comments.filter(function (x) { return x.id === id; })[0];
     if (!c) return null;
     if (typeof changes.text === "string") c.text = changes.text.slice(0, 5000);
     if (typeof changes.resolved === "boolean") c.resolved = changes.resolved;
+    if (typeof changes.solution === "boolean") c.solution = changes.solution;
     if (typeof changes.color === "string") c.color = changes.color;
     if (changes.reply) c.replies.push(changes.reply);
     if (changes.editReply) {
       var ri = c.replies.findIndex(function (r) { return r.id === changes.editReply.id; });
       if (ri >= 0) { c.replies[ri] = Object.assign({}, c.replies[ri], { text: changes.editReply.text }); }
+    }
+    if (changes.solutionReply) {
+      var sri = c.replies.findIndex(function (r) { return r.id === changes.solutionReply.id; });
+      if (sri >= 0) { c.replies[sri] = Object.assign({}, c.replies[sri], { solution: !!changes.solutionReply.solution }); }
     }
     if (changes.deleteReply) {
       c.replies = c.replies.filter(function (r) { return r.id !== changes.deleteReply; });
@@ -212,6 +435,12 @@
     return c;
   }
   function removeComment(id) {
+    if (CFG.live.enabled) {
+      state.comments = state.comments.filter(function (c) { return c.id !== id; });
+      removeLiveDraft(id);
+      syncLiveDelete(id);
+      return;
+    }
     var d = dbRead();
     d.comments = d.comments.filter(function (c) { return c.id !== id; });
     dbWrite(d);
@@ -467,6 +696,9 @@
   .an-rbadge { display:inline-flex; align-items:center; gap:3px; font:600 10px var(--an-font);
     color: var(--an-ok); }
   .an-rbadge svg { width:11px; height:11px; }
+  .an-sbadge { display:inline-flex; align-items:center; gap:3px; font:700 10px var(--an-font);
+    color: var(--an-btn-bg); }
+  .an-sbadge svg { width:11px; height:11px; }
   .an-quote { font-size:12px; color: var(--an-muted); background: var(--an-surface-2);
     border-left:3px solid var(--an-border-strong);
     padding:5px 9px; border-radius:0 6px 6px 0; margin:6px 0; line-height:1.45;
@@ -475,9 +707,14 @@
     white-space:pre-wrap; word-break:break-word; }
   .an-replies { margin-top:9px; border-top:1px dashed var(--an-border); padding-top:8px;
     display:flex; flex-direction:column; gap:7px; }
-  .an-reply { display:flex; gap:8px; font-size:12.5px; line-height:1.45; }
-  .an-reply .an-rwho { font-weight:600; margin-right:5px; }
-  .an-reply .an-rwhen { color: var(--an-muted); font-size:10.5px; margin-left:5px; }
+  .an-reply { display:flex; align-items:flex-start; gap:8px; font-size:12.5px; line-height:1.45; }
+  .an-rcontent { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .an-rhead { display:flex; align-items:center; gap:5px; min-width:0; }
+  .an-reply .an-rwho { font-weight:600; }
+  .an-reply .an-rwhen { color: var(--an-muted); font-size:10.5px; }
+  .an-rtext { overflow-wrap:anywhere; white-space:pre-wrap; }
+  .an-ract { display:flex; justify-content:flex-end; align-self:flex-end; gap:4px;
+    flex:none; flex-wrap:wrap; align-items:flex-start; margin-top:2px; max-width:100%; }
   .an-cact { display:flex; gap:5px; margin-top:10px; flex-wrap:wrap;
     opacity:.45; transition: opacity .15s; }
   .an-card:hover .an-cact, .an-card.an-active .an-cact { opacity:1; }
@@ -487,6 +724,9 @@
     transition: all .15s; }
   .an-mini svg { width:12px; height:12px; }
   .an-mini:hover { background: var(--an-surface-2); color: var(--an-fg); }
+  .an-mini.an-solution-on { background: rgba(109,40,217,.08); border-color: rgba(109,40,217,.35);
+    color: var(--an-btn-bg); font-weight:600; }
+  .an-mini.an-solution-on:hover { background: rgba(109,40,217,.13); color: var(--an-btn-bg); }
   .an-mini.an-danger:hover { background:rgba(225,29,72,.08); color: var(--an-danger);
     border-color: rgba(225,29,72,.3); }
   .an-replybox, .an-editbox { display:none; margin-top:8px; gap:6px; flex-direction:column; }
@@ -1459,7 +1699,7 @@
     });
     search.appendChild(searchInput);
     var filters = el("div", { class: "an-filters" });
-    [["open", "Open"], ["resolved", "Resolved"], ["all", "All"]].forEach(function (f) {
+    [["open", "Open"], ["solutions", "Solutions"], ["resolved", "Resolved"], ["all", "All"]].forEach(function (f) {
       var ch = el("span", { class: "an-chip" + (state.filter === f[0] ? " an-on" : ""), "data-f": f[0], text: f[1] });
       ch.addEventListener("click", function () {
         state.filter = f[0];
@@ -1736,9 +1976,13 @@
   }
 
   var TYPE_LABEL = { highlight: "Highlight", shape: "Shape", pin: "Pin", pen: "Sketch", note: "Note", block: "Section" };
+  function threadHasSolution(c) {
+    return !!(c && (c.solution || (c.replies || []).some(function (r) { return r.solution; })));
+  }
   function visibleComments() {
     return state.comments.filter(function (c) {
       if (state.filter === "open" && c.resolved) return false;
+      if (state.filter === "solutions" && !threadHasSolution(c)) return false;
       if (state.filter === "resolved" && !c.resolved) return false;
       if (state.query) {
         var hay = ((c.text || "") + " " + (c.author || "") + " " +
@@ -1759,6 +2003,8 @@
         ? "No comments match “" + esc(state.query) + "”."
         : state.filter === "resolved"
           ? "Nothing resolved yet."
+          : state.filter === "solutions"
+            ? "No solutions marked yet."
           : "No comments yet.<br>Select any text, or pick a tool from the toolbar — try <kbd>H</kbd> highlight or <kbd>P</kbd> pin.";
       listEl.appendChild(el("div", { class: "an-empty" }, [
         el("div", { class: "an-eicon", html: ICONS.bubble }),
@@ -1774,13 +2020,15 @@
       var meta = el("div", { class: "an-cmeta" }, [
         avatarEl(c.author),
         el("span", { class: "an-author", text: c.author || "Anonymous" }),
-        el("span", { class: "an-tag" }, [
-          (function(){ var d = el("span",{class:"an-dot"}); d.style.background=c.color; return d; })(),
-          document.createTextNode("#" + idx + " " + (TYPE_LABEL[c.type] || c.type)),
-        ]),
-        c.resolved ? el("span", { class: "an-rbadge", html: ICONS.check + "<span>Resolved</span>" }) : null,
-        el("span", { class: "an-when", text: fmtTime(c.createdAt) }),
-      ]);
+	        el("span", { class: "an-tag" }, [
+	          (function(){ var d = el("span",{class:"an-dot"}); d.style.background=c.color; return d; })(),
+	          document.createTextNode("#" + idx + " " + (TYPE_LABEL[c.type] || c.type)),
+	        ]),
+	        c.livePending ? el("span", { class: "an-rbadge", html: ICONS.info + "<span>Offline draft</span>" }) : null,
+	        c.solution ? el("span", { class: "an-sbadge", html: ICONS.check + "<span>Solution</span>" }) : null,
+	        c.resolved ? el("span", { class: "an-rbadge", html: ICONS.check + "<span>Resolved</span>" }) : null,
+	        el("span", { class: "an-when", text: fmtTime(c.createdAt) }),
+	      ]);
       card.appendChild(meta);
       if (c.type === "highlight" && c.anchor && c.anchor.exact)
         card.appendChild(el("div", { class: "an-quote", text: '“' + c.anchor.exact + '”' }));
@@ -1790,16 +2038,27 @@
       if (c.replies && c.replies.length) {
         var rep = el("div", { class: "an-replies" });
         c.replies.forEach(function (r) {
+          var replyContent = el("span", { class: "an-rcontent" }, [
+            el("span", { class: "an-rhead" }, [
+            el("span", { class: "an-rwho", text: r.author }),
+            r.solution ? el("span", { class: "an-sbadge", html: ICONS.check + "<span>Solution</span>" }) : null,
+            el("span", { class: "an-rwhen", text: fmtTime(r.createdAt) }),
+            ]),
+            el("span", { class: "an-rtext", text: r.text }),
+          ]);
           var replyRow = el("div", { class: "an-reply" }, [
             avatarEl(r.author, 18),
-            el("span", { style: "flex:1;min-width:0" }, [
-              el("span", { class: "an-rwho", text: r.author }),
-              document.createTextNode(r.text),
-              el("span", { class: "an-rwhen", text: fmtTime(r.createdAt) }),
-            ]),
+            replyContent,
           ]);
+          var rAct = el("span", { class: "an-ract" });
+          var rSolution = el("button", { class: "an-mini" + (r.solution ? " an-solution-on" : ""), html: ICONS.check + "<span>" + (r.solution ? "Unmark solution" : "Mark solution") + "</span>" });
+          rSolution.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var updated = patchComment(c.id, { solutionReply: { id: r.id, solution: !r.solution } });
+            if (updated) { mergeComment(updated); renderPanel(); }
+          });
+          rAct.appendChild(rSolution);
           if (r.author === state.author) {
-            var rAct = el("span", { style: "display:flex;gap:4px;flex:none;margin-left:6px" });
             var rDel = el("button", { class: "an-mini an-danger", html: ICONS.trash, title: "Delete reply" });
             rDel.addEventListener("click", function (e) {
               e.stopPropagation();
@@ -1807,8 +2066,8 @@
               if (updated) { mergeComment(updated); renderPanel(); }
             });
             rAct.appendChild(rDel);
-            replyRow.appendChild(rAct);
           }
+          replyContent.appendChild(rAct);
           rep.appendChild(replyRow);
         });
         card.appendChild(rep);
@@ -1821,7 +2080,7 @@
       rbox.appendChild(rsend);
       function submitReply() {
         if (!rin.value.trim()) return;
-        var reply = { id: uid(), author: state.author || "Anonymous", text: rin.value.trim(), createdAt: new Date().toISOString() };
+        var reply = { id: uid(), author: state.author || "Anonymous", text: rin.value.trim(), solution: false, createdAt: new Date().toISOString() };
         var updated = patchComment(c.id, { reply: reply });
         if (updated) { rin.value = ""; mergeComment(updated); renderPanel(); }
       }
@@ -1856,6 +2115,11 @@
           e.stopPropagation();
           var updated = patchComment(c.id, { resolved: !c.resolved });
           if (updated) { mergeComment(updated); renderAll(); renderPanel(); }
+        } }),
+        el("button", { class: "an-mini" + (c.solution ? " an-solution-on" : ""), html: ICONS.check + "<span>" + (c.solution ? "Unmark solution" : "Mark solution") + "</span>", onclick: function (e) {
+          e.stopPropagation();
+          var updated = patchComment(c.id, { solution: !c.solution });
+          if (updated) { mergeComment(updated); renderPanel(); }
         } }),
         c.author === state.author ? el("button", { class: "an-mini", html: ICONS.edit + "<span>Edit</span>", onclick: function (e) {
           e.stopPropagation();
@@ -2023,17 +2287,26 @@
     }
   }
 
-  function renderFooter() {
-    if (!footEl) return;
-    var n = state.comments.length;
-    var canShare = !!(state.share && state.share.trim());
-    footEl.innerHTML = "";
-    footEl.appendChild(el("div", { class: "an-localnote" }, [
-      el("span", { html: ICONS.info }),
-      el("span", { text: canShare
-        ? "Saved in this browser. Download or share to send your comments."
-        : "Saved in this browser. Download to send your comments." }),
-    ]));
+	  function renderFooter() {
+	    if (!footEl) return;
+	    var n = state.comments.length;
+	    var canShare = !!(state.share && state.share.trim());
+	    var liveCopy = CFG.live.enabled
+	      ? state.liveStatus === "online"
+	        ? "Live shared review. Comments are synced with the review service."
+	        : state.liveStatus === "offline"
+	          ? "Offline draft saved locally. Retry when the review service is available."
+	          : state.liveStatus === "unavailable"
+	            ? "Review service unavailable. New comments stay as offline drafts."
+	            : "Connecting to live shared review…"
+	      : "";
+	    footEl.innerHTML = "";
+	    footEl.appendChild(el("div", { class: "an-localnote" }, [
+	      el("span", { html: ICONS.info }),
+	      el("span", { text: liveCopy || (canShare
+	        ? "Saved in this browser. Download or share to send your comments."
+	        : "Saved in this browser. Download to send your comments.") }),
+	    ]));
     footEl.appendChild(el("div", { class: "an-footrow" }, [
       el("button", { class: "an-fbtn" + (n ? " an-pulse" : ""), title: "Download comments as JSON", html: ICONS.download + "<span>Download</span>", onclick: exportComments }),
       canShare ? el("button", { class: "an-fbtn", title: "Send comments to " + state.share, html: ICONS.share + "<span>Share</span>", onclick: shareComments }) : null,
@@ -2204,12 +2477,16 @@
   // BOOT
   // ==========================================================================
   var firstLoad = true;
-  function load() {
-    if (pendingDraft || drawing) return;
-    state.comments = pageComments().filter(function (c) { return !pendingDeletes[c.id]; });
-    renderAll();
-    renderPanel();
-    if (firstLoad) {
+	  function load() {
+	    if (pendingDraft || drawing) return;
+	    state.comments = pageComments().filter(function (c) { return !pendingDeletes[c.id]; });
+	    renderAll();
+	    renderPanel();
+	    if (CFG.live.enabled) {
+	      syncLiveList();
+	      subscribeLive();
+	    }
+	    if (firstLoad) {
       firstLoad = false;
       var m = location.hash.match(/^#an=(.+)$/);
       if (m) {
@@ -2241,7 +2518,7 @@
   }
 
   // public API — lets host pages and other scripts compose with the layer
-  window.Annotate = {
+  var api = {
     version: VERSION,
     config: CFG,
     open: function () { ensureEnabled(); openPanel(); },
@@ -2266,6 +2543,8 @@
       load();
     },
   };
+  window.MarkUS = api;
+  window.Annotate = api;
 
   if (document.readyState === "loading")
     document.addEventListener("DOMContentLoaded", boot);

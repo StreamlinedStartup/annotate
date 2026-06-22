@@ -197,10 +197,11 @@ test.describe('Comments panel', () => {
   test('filter chips are visible', async ({ page }) => {
     await page.keyboard.press('a');
     const filters = page.locator('.an-chip');
-    await expect(filters).toHaveCount(3);
+    await expect(filters).toHaveCount(4);
     await expect(filters.nth(0)).toHaveText('Open');
-    await expect(filters.nth(1)).toHaveText('Resolved');
-    await expect(filters.nth(2)).toHaveText('All');
+    await expect(filters.nth(1)).toHaveText('Solutions');
+    await expect(filters.nth(2)).toHaveText('Resolved');
+    await expect(filters.nth(3)).toHaveText('All');
   });
 
   test('search filters comments', async ({ page }) => {
@@ -403,6 +404,61 @@ test.describe('Comment actions', () => {
     await expect(page.locator('.an-card')).toHaveCount(1);
   });
 
+  test('marks a top-level comment as a solution', async ({ page }) => {
+    const card = page.locator('.an-card').first();
+    await card.hover();
+    await card.locator('.an-mini', { hasText: 'Mark solution' }).click();
+
+    await expect(card.locator('.an-sbadge')).toContainText('Solution');
+    await page.locator('.an-chip', { hasText: 'Solutions' }).click();
+    await expect(page.locator('.an-card')).toHaveCount(1);
+    await expect(page.locator('.an-card')).toContainText('Initial comment');
+
+    await page.locator('.an-chip', { hasText: 'Open' }).click();
+    await expect(page.locator('.an-card')).toHaveCount(1);
+  });
+
+  test('marks a reply as a solution', async ({ page }) => {
+    const card = page.locator('.an-card').first();
+    await card.hover();
+    await card.locator('.an-mini', { hasText: 'Reply' }).click();
+    const replyInput = card.locator('.an-replybox .an-ta');
+    await replyInput.fill('Use this answer because it has enough text to wrap on the reply row.');
+    await card.locator('.an-replybox .an-primary').click();
+
+    const reply = card.locator('.an-reply').first();
+    await reply.locator('.an-mini', { hasText: 'Mark solution' }).click();
+
+    await expect(reply.locator('.an-sbadge')).toContainText('Solution');
+    const unmarkButton = reply.locator('.an-mini', { hasText: 'Unmark solution' });
+    await expect(unmarkButton).toHaveClass(/an-solution-on/);
+    const unmarkBox = await unmarkButton.boundingBox();
+    expect(unmarkBox.height).toBeLessThanOrEqual(34);
+    const replyLayout = await reply.evaluate(row => {
+      const author = row.querySelector('.an-rwho').getBoundingClientRect();
+      const actions = row.querySelector('.an-mini').parentElement.getBoundingClientRect();
+      const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+      let textNode;
+      while ((textNode = walker.nextNode())) {
+        if (textNode.nodeValue.includes('Use this answer because')) break;
+      }
+      const range = document.createRange();
+      range.selectNodeContents(textNode);
+      const text = range.getBoundingClientRect();
+      return {
+        authorBottom: author.bottom,
+        textTop: text.top,
+        textBottom: text.bottom,
+        actionsTop: actions.top,
+      };
+    });
+    expect(replyLayout.textTop).toBeGreaterThanOrEqual(replyLayout.authorBottom - 1);
+    expect(replyLayout.actionsTop).toBeGreaterThanOrEqual(replyLayout.textBottom - 1);
+    await page.locator('.an-chip', { hasText: 'Solutions' }).click();
+    await expect(page.locator('.an-card')).toHaveCount(1);
+    await expect(page.locator('.an-card')).toContainText('Use this answer because it has enough text');
+  });
+
   test('delete with undo', async ({ page }) => {
     const card = page.locator('.an-card').first();
     await card.hover();
@@ -603,10 +659,47 @@ test.describe('Theme', () => {
 // ============================================================
 // PUBLIC API
 // ============================================================
-test.describe('Public API (window.Annotate)', () => {
+test.describe('Public API (window.Annotate / window.MarkUS)', () => {
   test('exposes version', async ({ page }) => {
     const version = await page.evaluate(() => window.Annotate.version);
     expect(version).toBe('1.0.1');
+  });
+
+  test('exposes MarkUS as the canonical API alias', async ({ page }) => {
+    const apiShape = await page.evaluate(() => ({
+      sameObject: window.MarkUS === window.Annotate,
+      markusVersion: window.MarkUS && window.MarkUS.version,
+      annotateVersion: window.Annotate && window.Annotate.version,
+    }));
+
+    expect(apiShape).toEqual({
+      sameObject: true,
+      markusVersion: '1.0.1',
+      annotateVersion: '1.0.1',
+    });
+  });
+
+  test('markus.js bootstraps the review UI and legacy Annotate alias', async ({ page }) => {
+    await page.route('**/markus-test.html', route => route.fulfill({
+      contentType: 'text/html',
+      body: `<!doctype html>
+        <html>
+          <head><title>MarkUS asset test</title></head>
+          <body>
+            <main><h1>MarkUS asset test</h1><p>Review this page.</p></main>
+            <script src="/markus.js" data-project="markus-asset-test" defer></script>
+          </body>
+        </html>`,
+    }));
+
+    await page.goto('/markus-test.html');
+    await page.waitForFunction(() => !!window.MarkUS && !!window.Annotate);
+
+    expect(await page.evaluate(() => window.MarkUS === window.Annotate)).toBe(true);
+    await expect(page.locator('#__an_launch')).toBeVisible();
+    await page.evaluate(() => window.MarkUS.open());
+    await expect(page.locator('#__an_panel')).toHaveClass(/an-open/);
+    await expectPanelInViewport(page);
   });
 
   test('open() / close() control the panel', async ({ page }) => {
@@ -747,6 +840,120 @@ test.describe('Framework integration pages', () => {
     // Navigate within SPA
     await page.locator('a[data-route]').first().click();
     await expect(page.locator('#__an_bar')).toBeVisible({ timeout: 3000 });
+  });
+});
+
+// ============================================================
+// LIVE MARKUS MODE
+// ============================================================
+test.describe('Live MarkUS mode', () => {
+  async function routeLivePage(page, body = '') {
+    await page.route('**/live-markus.html', route => route.fulfill({
+      contentType: 'text/html',
+      body: `<!doctype html>
+        <html>
+          <head><title>Live MarkUS test</title></head>
+          <body>
+            <main><h1>Live MarkUS test</h1><p>Shared review target.</p>${body}</main>
+            <script
+              src="/markus.js"
+              data-project="live-markus"
+              data-page="/live-markus"
+              data-review-id="launch-homepage-v3"
+              data-api-base-url="http://localhost:4200"
+              data-public-key="rvw_pub_test"
+              data-realtime="false"
+              data-start-open="true"
+              defer></script>
+          </body>
+        </html>`,
+    }));
+  }
+
+  test('loads shared comments from the scoped live API', async ({ page }) => {
+    await routeLivePage(page);
+    await page.route('**/api/reviews/launch-homepage-v3/comments**', route => {
+      expect(route.request().headers()['x-markus-public-key']).toBe('rvw_pub_test');
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          comments: [{
+            id: 'srv_comment_1',
+            page: 'live-markus:/live-markus',
+            url: 'http://127.0.0.1/live-markus',
+            type: 'pin',
+            author: 'Live Reviewer',
+            text: 'Shared live comment',
+            color: '#f59e0b',
+            geom: { kind: 'pin', selector: 'body', x: 0.4, y: 0.2 },
+            resolved: false,
+            replies: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }],
+        }),
+      });
+    });
+
+    await page.goto('/live-markus.html');
+    await page.waitForFunction(() => window.MarkUS && window.MarkUS.config.live.enabled);
+    await expect(page.locator('.an-card')).toHaveCount(1);
+    await expect(page.locator('.an-card')).toContainText('Shared live comment');
+    await expect(page.locator('#__an_foot')).toContainText('Live shared review');
+  });
+
+  test('posts new comments to the live API and uses the saved record', async ({ page }) => {
+    await routeLivePage(page);
+    await page.route('**/api/reviews/launch-homepage-v3/comments**', async route => {
+      const req = route.request();
+      if (req.method() === 'GET') {
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ comments: [] }) });
+        return;
+      }
+
+      expect(req.method()).toBe('POST');
+      expect(req.headers()['x-markus-public-key']).toBe('rvw_pub_test');
+      const payload = req.postDataJSON();
+      expect(payload.comment.text).toBe('Live pin saved');
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          comment: { ...payload.comment, id: 'srv_created_1', livePending: false },
+        }),
+      });
+    });
+
+    await page.goto('/live-markus.html');
+    await page.waitForFunction(() => window.MarkUS && window.MarkUS.config.live.enabled);
+    await page.keyboard.press('p');
+    await page.locator('h1').click();
+    await page.locator('#__an_compose textarea').fill('Live pin saved');
+    await page.locator('#__an_compose .an-primary').click();
+
+    await expect(page.locator('.an-card[data-id="srv_created_1"]')).toContainText('Live pin saved');
+    await expect(page.locator('.an-card')).not.toContainText('Offline draft');
+  });
+
+  test('keeps failed live writes as explicit offline drafts', async ({ page }) => {
+    await routeLivePage(page);
+    await page.route('**/api/reviews/launch-homepage-v3/comments**', async route => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ comments: [] }) });
+        return;
+      }
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'offline' }) });
+    });
+
+    await page.goto('/live-markus.html');
+    await page.waitForFunction(() => window.MarkUS && window.MarkUS.config.live.enabled);
+    await page.keyboard.press('p');
+    await page.locator('h1').click();
+    await page.locator('#__an_compose textarea').fill('Save when back online');
+    await page.locator('#__an_compose .an-primary').click();
+
+    await expect(page.locator('.an-card')).toContainText('Save when back online');
+    await expect(page.locator('.an-card')).toContainText('Offline draft');
+    await expect(page.locator('#__an_foot')).toContainText('Offline draft');
   });
 });
 

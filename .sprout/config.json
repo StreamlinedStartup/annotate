@@ -1,7 +1,7 @@
 {
   "branch_prefix": "sprout/",
   "base_branch": "main",
-  "auto_checkout": true,
+  "auto_checkout": false,
   "commit_on_done": true,
   "create_pr_on_epic_done": true,
   "prime_pull_requests": true,
@@ -11,7 +11,8 @@
     "coverage/**",
     "*.log",
     "tmp/**",
-    ".DS_Store"
+    ".DS_Store",
+    ".codegraph/**"
   ],
   "auto_include_patterns": [
     "go.sum",

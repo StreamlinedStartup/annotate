@@ -1,0 +1,58 @@
+services:
+  markus-pocketbase:
+    image: ghcr.io/muchobien/pocketbase:0.39.4
+    container_name: markus-pocketbase
+    restart: unless-stopped
+    command:
+      - serve
+      - --http=0.0.0.0:8090
+      - --dir=/pb_data
+      - --hooksDir=/pb_hooks
+      - --migrationsDir=/pb_migrations
+    environment:
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL:-}
+      PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD:-}
+      ENCRYPTION: ${PB_ENCRYPTION:-}
+      MARKUS_PUBLIC_BASE_URL: ${MARKUS_PUBLIC_BASE_URL:-http://localhost:8090}
+      MARKUS_MAX_COMMENT_BYTES: ${MARKUS_MAX_COMMENT_BYTES:-4000}
+      MARKUS_RATE_LIMIT_WINDOW_SECONDS: ${MARKUS_RATE_LIMIT_WINDOW_SECONDS:-60}
+      MARKUS_RATE_LIMIT_MAX_REQUESTS: ${MARKUS_RATE_LIMIT_MAX_REQUESTS:-60}
+    ports:
+      - "${MARKUS_POCKETBASE_PORT:-8090}:8090"
+    volumes:
+      - markus_pb_data:/pb_data
+      - ./markus-service/pb_migrations:/pb_migrations:ro
+      - ./markus-service/pb_hooks:/pb_hooks:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8090/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: markus-caddy
+    profiles:
+      - proxy
+    restart: unless-stopped
+    depends_on:
+      markus-pocketbase:
+        condition: service_healthy
+    command:
+      - caddy
+      - reverse-proxy
+      - --from
+      - ${MARKUS_PROXY_FROM:-reviews.example.com}
+      - --to
+      - markus-pocketbase:8090
+    ports:
+      - "${MARKUS_HTTP_PORT:-80}:80"
+      - "${MARKUS_HTTPS_PORT:-443}:443"
+    volumes:
+      - markus_caddy_data:/data
+      - markus_caddy_config:/config
+
+volumes:
+  markus_pb_data:
+  markus_caddy_data:
+  markus_caddy_config:

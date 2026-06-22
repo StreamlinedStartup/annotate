@@ -1,0 +1,114 @@
+{
+  "id": "351a7d94-6121-4aa0-923c-6005a6b64324",
+  "revision": 8,
+  "title": "Configure Sprout and Conductor workspace durability",
+  "description": "Add repository-level Conductor setup so new worktrees validate/install Sprout and use the project package manager without npm. Install/update Sprout prime instructions and hooks so task state and traceability are tracked consistently across Conductor workspaces.",
+  "status": "done",
+  "priority": "high",
+  "epic_number": 1,
+  "created_at": "2026-06-21T22:52:01-07:00",
+  "updated_at": "2026-06-21T22:59:30-07:00",
+  "git_branch": "epic/1-markus-live-shared-review",
+  "affected_files": [
+    {
+      "path": ".conductor/settings.toml",
+      "reason": "shared Conductor setup/run configuration for every workspace"
+    },
+    {
+      "path": "AGENTS.md",
+      "reason": "persistent Sprout and repository agent instructions"
+    },
+    {
+      "path": "CLAUDE.md",
+      "reason": "persistent Sprout and repository agent instructions"
+    }
+  ],
+  "verify_command": "sprout doctor \u0026\u0026 sprout hooks status --provider all",
+  "consecutive_failures": 0,
+  "agent_notes": [
+    {
+      "timestamp": "2026-06-21T22:54:04-07:00",
+      "author": "agent",
+      "kind": "decision",
+      "content": "Conductor worktrees cannot check out local main because the root repository owns that worktree branch, so Sprout auto_checkout is disabled and work remains on the Conductor workspace branch while task state tracks the epic review unit."
+    },
+    {
+      "timestamp": "2026-06-21T22:54:08-07:00",
+      "author": "agent",
+      "kind": "decision",
+      "content": "Treat .codegraph/ as generated local index state for this workspace; do not commit or revert it as part of MarkUS work. Add it to Sprout drift ignore so verification focuses on tracked project changes."
+    },
+    {
+      "timestamp": "2026-06-21T22:59:30-07:00",
+      "author": "agent",
+      "kind": "decision",
+      "content": "In Conductor worktrees, complete epic tasks with sprout update --status done plus a normal workspace-branch commit because sprout done --yes tries to check out the epic/base branch and conflicts with the root worktree's local main checkout."
+    }
+  ],
+  "events": [
+    {
+      "timestamp": "2026-06-21T22:52:01-07:00",
+      "kind": "created",
+      "description": "Task created"
+    },
+    {
+      "timestamp": "2026-06-21T22:52:01-07:00",
+      "kind": "assigned_to_epic",
+      "description": "Task assigned to epic",
+      "metadata": {
+        "epic": "1"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T22:53:46-07:00",
+      "kind": "started",
+      "description": "Task started",
+      "metadata": {
+        "agent": "codex"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T22:54:04-07:00",
+      "kind": "note_added",
+      "description": "Agent note added",
+      "metadata": {
+        "author": "agent",
+        "kind": "decision"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T22:54:08-07:00",
+      "kind": "note_added",
+      "description": "Agent note added",
+      "metadata": {
+        "author": "agent",
+        "kind": "decision"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T22:58:48-07:00",
+      "kind": "verified",
+      "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-21T22:59:30-07:00",
+      "kind": "note_added",
+      "description": "Agent note added",
+      "metadata": {
+        "author": "agent",
+        "kind": "decision"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T22:59:30-07:00",
+      "kind": "updated",
+      "description": "Task updated"
+    },
+    {
+      "timestamp": "2026-06-21T22:59:30-07:00",
+      "kind": "released",
+      "description": "Task lease released"
+    }
+  ],
+  "summary": "Initialized Sprout project state, added the MarkUS epic/task plan, disabled Sprout auto-checkout for Conductor worktrees, ignored generated .codegraph state, installed Sprout hooks, and refreshed AGENTS.md/CLAUDE.md prime blocks."
+}

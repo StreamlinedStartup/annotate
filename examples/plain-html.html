@@ -3,26 +3,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>annotate.js — plain HTML example</title>
+  <title>MarkUS — plain HTML example</title>
 </head>
 <body>
   <h1>Any static page</h1>
   <p>
-    This is all it takes. The single script tag at the bottom of the page adds
-    the full review toolbar. Select this paragraph to highlight it, or press
-    <kbd>R</kbd> to draw a rectangle.
+    This is all it takes. The single MarkUS script tag at the bottom of the
+    page adds the full review toolbar. Select this paragraph to highlight it,
+    or press <kbd>R</kbd> to draw a rectangle.
   </p>
 
   <!--
-    The whole installation: one script tag before </body>.
-    In production, point this at the CDN:
+    Local-only install: one script tag before </body>.
+    Comments stay in this browser until exported.
 
-      <script src="https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js" defer></script>
+      <script src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js" defer></script>
+
+    Add data-review-id, data-api-base-url, and data-public-key to enable
+    live shared review against a self-hosted MarkUS service.
   -->
   <script
-    src="https://cdn.jsdelivr.net/npm/@reviewjs/annotate/annotate.js"
+    src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js"
     data-project="my-static-site"
     data-accent="#0ea5e9"
+    data-review-id="launch-homepage-v3"
+    data-api-base-url="http://localhost:8090"
+    data-public-key="rvw_pub_local"
     defer
   ></script>
 </body>
