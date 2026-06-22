@@ -707,9 +707,14 @@
     white-space:pre-wrap; word-break:break-word; }
   .an-replies { margin-top:9px; border-top:1px dashed var(--an-border); padding-top:8px;
     display:flex; flex-direction:column; gap:7px; }
-  .an-reply { display:flex; gap:8px; font-size:12.5px; line-height:1.45; }
-  .an-reply .an-rwho { font-weight:600; margin-right:5px; }
-  .an-reply .an-rwhen { color: var(--an-muted); font-size:10.5px; margin-left:5px; }
+  .an-reply { display:flex; align-items:flex-start; gap:8px; font-size:12.5px; line-height:1.45; }
+  .an-rcontent { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .an-rhead { display:flex; align-items:center; gap:5px; min-width:0; }
+  .an-reply .an-rwho { font-weight:600; }
+  .an-reply .an-rwhen { color: var(--an-muted); font-size:10.5px; }
+  .an-rtext { overflow-wrap:anywhere; white-space:pre-wrap; }
+  .an-ract { display:flex; justify-content:flex-end; align-self:flex-end; gap:4px;
+    flex:none; flex-wrap:wrap; align-items:flex-start; margin-top:2px; max-width:100%; }
   .an-cact { display:flex; gap:5px; margin-top:10px; flex-wrap:wrap;
     opacity:.45; transition: opacity .15s; }
   .an-card:hover .an-cact, .an-card.an-active .an-cact { opacity:1; }
@@ -2033,17 +2038,19 @@
       if (c.replies && c.replies.length) {
         var rep = el("div", { class: "an-replies" });
         c.replies.forEach(function (r) {
-          var replyText = el("span", { style: "flex:1;min-width:0" }, [
+          var replyContent = el("span", { class: "an-rcontent" }, [
+            el("span", { class: "an-rhead" }, [
             el("span", { class: "an-rwho", text: r.author }),
             r.solution ? el("span", { class: "an-sbadge", html: ICONS.check + "<span>Solution</span>" }) : null,
-            document.createTextNode(r.text),
             el("span", { class: "an-rwhen", text: fmtTime(r.createdAt) }),
+            ]),
+            el("span", { class: "an-rtext", text: r.text }),
           ]);
           var replyRow = el("div", { class: "an-reply" }, [
             avatarEl(r.author, 18),
-            replyText,
+            replyContent,
           ]);
-          var rAct = el("span", { style: "display:flex;gap:4px;flex:none;margin-left:6px;flex-wrap:wrap;align-items:flex-start" });
+          var rAct = el("span", { class: "an-ract" });
           var rSolution = el("button", { class: "an-mini" + (r.solution ? " an-solution-on" : ""), html: ICONS.check + "<span>" + (r.solution ? "Unmark solution" : "Mark solution") + "</span>" });
           rSolution.addEventListener("click", function (e) {
             e.stopPropagation();
@@ -2060,7 +2067,7 @@
             });
             rAct.appendChild(rDel);
           }
-          replyRow.appendChild(rAct);
+          replyContent.appendChild(rAct);
           rep.appendChild(replyRow);
         });
         card.appendChild(rep);

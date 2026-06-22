@@ -434,6 +434,26 @@ test.describe('Comment actions', () => {
     await expect(unmarkButton).toHaveClass(/an-solution-on/);
     const unmarkBox = await unmarkButton.boundingBox();
     expect(unmarkBox.height).toBeLessThanOrEqual(34);
+    const replyLayout = await reply.evaluate(row => {
+      const author = row.querySelector('.an-rwho').getBoundingClientRect();
+      const actions = row.querySelector('.an-mini').parentElement.getBoundingClientRect();
+      const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+      let textNode;
+      while ((textNode = walker.nextNode())) {
+        if (textNode.nodeValue.includes('Use this answer because')) break;
+      }
+      const range = document.createRange();
+      range.selectNodeContents(textNode);
+      const text = range.getBoundingClientRect();
+      return {
+        authorBottom: author.bottom,
+        textTop: text.top,
+        textBottom: text.bottom,
+        actionsTop: actions.top,
+      };
+    });
+    expect(replyLayout.textTop).toBeGreaterThanOrEqual(replyLayout.authorBottom - 1);
+    expect(replyLayout.actionsTop).toBeGreaterThanOrEqual(replyLayout.textBottom - 1);
     await page.locator('.an-chip', { hasText: 'Solutions' }).click();
     await expect(page.locator('.an-card')).toHaveCount(1);
     await expect(page.locator('.an-card')).toContainText('Use this answer because it has enough text');
