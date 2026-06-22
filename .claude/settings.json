@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": ".sprout/hooks/sprout-hook claude PostToolUse",
+            "name": "sprout-claude-posttooluse",
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write|MultiEdit|Bash"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": ".sprout/hooks/sprout-hook claude SessionStart",
+            "name": "sprout-claude-sessionstart",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": ".sprout/hooks/sprout-hook claude Stop",
+            "name": "sprout-claude-stop",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ]
+  }
+}

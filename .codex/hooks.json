@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": ".sprout/hooks/sprout-hook codex PostToolUse",
+            "name": "sprout-codex-posttooluse",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": ".sprout/hooks/sprout-hook codex SessionStart",
+            "name": "sprout-codex-sessionstart",
+            "type": "command"
+          }
+        ],
+        "matcher": "startup|resume"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": ".sprout/hooks/sprout-hook codex Stop",
+            "name": "sprout-codex-stop",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ]
+  }
+}
