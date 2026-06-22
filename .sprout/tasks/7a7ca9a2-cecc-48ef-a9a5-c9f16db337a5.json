@@ -1,0 +1,79 @@
+{
+  "id": "7a7ca9a2-cecc-48ef-a9a5-c9f16db337a5",
+  "revision": 7,
+  "title": "Publish MarkUS localhost integration patch",
+  "description": "Publish a patch npm release so unpkg serves the PocketBase live API route fix.",
+  "status": "done",
+  "priority": "high",
+  "created_at": "2026-06-22T01:09:59-07:00",
+  "updated_at": "2026-06-22T01:17:26-07:00",
+  "git_branch": "sprout/7a7ca9a2",
+  "affected_files": [
+    {
+      "path": "package.json",
+      "reason": "bump npm package patch version for publish"
+    },
+    {
+      "path": "README.md",
+      "reason": "update pinned unpkg example for patch release"
+    }
+  ],
+  "verify_command": "sprout doctor \u0026\u0026 bun publish --dry-run",
+  "consecutive_failures": 0,
+  "agent_notes": [
+    {
+      "timestamp": "2026-06-22T01:17:19-07:00",
+      "author": "agent",
+      "kind": "observation",
+      "content": "Published @vulture916/markus@1.1.1 and verified unpkg serves annotate.js with /api/markus/v1 routes and pageKey query strings."
+    }
+  ],
+  "events": [
+    {
+      "timestamp": "2026-06-22T01:09:59-07:00",
+      "kind": "created",
+      "description": "Task created"
+    },
+    {
+      "timestamp": "2026-06-22T01:10:08-07:00",
+      "kind": "started",
+      "description": "Task started",
+      "metadata": {
+        "agent": "codex"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T01:10:08-07:00",
+      "kind": "scope_touched",
+      "description": "Affected file scope updated",
+      "metadata": {
+        "reason": "update pinned unpkg example for patch release"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T01:10:26-07:00",
+      "kind": "verified",
+      "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-22T01:17:19-07:00",
+      "kind": "note_added",
+      "description": "Agent note added",
+      "metadata": {
+        "author": "agent",
+        "kind": "observation"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T01:17:26-07:00",
+      "kind": "updated",
+      "description": "Task updated"
+    },
+    {
+      "timestamp": "2026-06-22T01:17:26-07:00",
+      "kind": "released",
+      "description": "Task lease released"
+    }
+  ],
+  "summary": "Published @vulture916/markus@1.1.1 with the localhost PocketBase live API route fix."
+}
