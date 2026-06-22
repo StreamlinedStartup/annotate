@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "@markus/client",
+      "name": "@vulture916/markus",
       "devDependencies": {
         "@playwright/test": "^1.61.0",
       },

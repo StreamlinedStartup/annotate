@@ -17,7 +17,7 @@ Embed model:
 
 ```html
 <script
-  src="https://unpkg.com/@markus/client@x.y.z/markus.js"
+  src="https://unpkg.com/@vulture916/markus@x.y.z/markus.js"
   data-review-id="launch-homepage-v3"
   data-api-base-url="https://reviews.example.com"
   data-public-key="rvw_pub_..."
@@ -39,7 +39,7 @@ Chosen defaults:
   - Public product name: **MarkUS**.
   - Browser asset: `markus.js`.
   - Global API: `window.MarkUS`.
-  - Package name target: `@markus/client`.
+  - Package name target: `@vulture916/markus` until the `@markus` npm scope is available.
 
 - Keep the browser client as a static CDN script:
   - Publish `markus.js` to npm/unpkg/jsDelivr.
@@ -176,7 +176,7 @@ Chosen defaults:
 ## Documentation / Examples
 
 - The top-level README documents:
-  - MarkUS naming and `@markus/client` script usage.
+  - MarkUS naming and `@vulture916/markus` script usage.
   - Local-only mode as the unchanged no-backend fallback.
   - Live shared embed attributes.
   - Docker Compose service startup, session/origin setup, reverse proxy, backup/restore, and admin security.

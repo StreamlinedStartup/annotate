@@ -3,7 +3,7 @@
  * Open-source edition · local-only · zero backend.
  *
  * Load with a single <script> tag:
- *   <script src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js" defer></script>
+ *   <script src="https://unpkg.com/@vulture916/markus/markus.js" defer></script>
  *
  * Comments are stored in the visitor's own browser (localStorage) and can be
  * exported to / imported from a portable JSON file — no server, no database,
