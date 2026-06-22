@@ -203,12 +203,19 @@ function markusPublicApi(e) {
     if (comment.getString("session") !== scope.session.id || comment.getBool("deleted")) {
       throw new NotFoundError("Comment not found.");
     }
+    var changes = body.changes || body;
 
-    if (typeof body.resolved === "boolean") {
-      comment.set("resolved", body.resolved);
+    var resolved = changes.resolved;
+    if (resolved === "true") {
+      resolved = true;
+    } else if (resolved === "false") {
+      resolved = false;
     }
-    if (typeof body.text === "string") {
-      var text = cleanText(body.text, Number($os.getenv("MARKUS_MAX_COMMENT_BYTES") || 4000));
+    if (typeof resolved === "boolean") {
+      comment.set("resolved", resolved);
+    }
+    if (typeof changes.text === "string") {
+      var text = cleanText(changes.text, Number($os.getenv("MARKUS_MAX_COMMENT_BYTES") || 4000));
       if (!text) {
         throw new BadRequestError("Missing comment text.");
       }

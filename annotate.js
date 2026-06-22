@@ -168,6 +168,7 @@
   var livePollTimer = null;
   var liveRealtime = null;
   var liveSyncInFlight = false;
+  var livePatchOverrides = {};
   function dbRead() {
     var d;
     try { d = JSON.parse(store.get(STORE_KEY) || "null"); } catch (e) { d = null; }
@@ -282,6 +283,17 @@
       if (!res.ok && res.status !== 204) throw new Error("Realtime subscription failed: " + res.status);
     });
   }
+  function applyLivePatchOverride(comment, override) {
+    if (!override) return comment;
+    var changes = override.changes || {};
+    var updated = override.updated || comment;
+    if (typeof changes.text === "string") comment.text = updated.text;
+    if (typeof changes.resolved === "boolean") comment.resolved = updated.resolved;
+    if (typeof changes.solution === "boolean") comment.solution = updated.solution;
+    if (typeof changes.color === "string") comment.color = updated.color;
+    if (changes.reply || changes.editReply || changes.solutionReply || changes.deleteReply) comment.replies = updated.replies;
+    return comment;
+  }
   function syncLiveList(options) {
     if (!CFG.live.enabled) return;
     if (liveSyncInFlight) return;
@@ -291,7 +303,10 @@
     function done() { liveSyncInFlight = false; }
     liveRequest("GET", liveListPath()).then(function (data) {
       var incoming = Array.isArray(data) ? data : (data.threads || data.comments || []);
-      state.comments = mergeLiveDrafts(incoming.map(normalizeComment))
+      state.comments = mergeLiveDrafts(incoming.map(function (comment) {
+        var normalized = normalizeComment(comment);
+        return applyLivePatchOverride(normalized, livePatchOverrides[normalized.id]);
+      }))
         .filter(function (c) { return !pendingDeletes[c.id]; });
       state.liveStatus = "online";
       renderAll();
@@ -324,15 +339,20 @@
   }
   function syncLivePatch(id, changes, updated) {
     if (updated.livePending) { saveLiveDraft(updated); return; }
+    livePatchOverrides[id] = { changes: changes, updated: updated };
     liveRequest("PATCH", "/comments/" + encodeURIComponent(id), Object.assign({
       reviewId: CFG.reviewId,
       page: PAGE,
     }, changes)).then(function (data) {
-      mergeComment(normalizeComment(data.comment || data || updated));
+      var saved = normalizeComment(data.comment || data || updated);
+      saved = applyLivePatchOverride(saved, livePatchOverrides[id]);
+      delete livePatchOverrides[id];
+      mergeComment(saved);
       state.liveStatus = "online";
       renderAll();
       renderPanel();
     }).catch(function () {
+      delete livePatchOverrides[id];
       updated.livePending = true;
       updated.liveError = "offline";
       saveLiveDraft(updated);

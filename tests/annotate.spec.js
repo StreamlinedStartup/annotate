@@ -1096,16 +1096,21 @@ test.describe('Live MarkUS mode', () => {
       patchPayload = req.postDataJSON();
       expect(patchPayload.resolved).toBe(true);
       expect(patchPayload.changes).toBeUndefined();
+      const staleThread = thread();
       resolved = true;
       await route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify({ comment: thread() }),
+        body: JSON.stringify({ comment: staleThread }),
       });
     });
 
     await page.goto('/live-markus.html');
     await expect(page.locator('.an-card[data-id="srv_resolve_comment"]')).toBeVisible();
+    const patchResponse = page.waitForResponse(res =>
+      res.request().method() === 'PATCH' && res.url().includes('/comments/srv_resolve_comment')
+    );
     await page.locator('.an-card[data-id="srv_resolve_comment"] .an-mini', { hasText: 'Resolve' }).click();
+    await patchResponse;
     await expect.poll(() => patchPayload, { timeout: 3000 }).toBeTruthy();
     await expect(page.locator('.an-card[data-id="srv_resolve_comment"]')).toHaveCount(0);
     await page.locator('.an-chip', { hasText: 'Resolved' }).click();
