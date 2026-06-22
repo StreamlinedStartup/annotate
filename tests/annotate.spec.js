@@ -603,10 +603,47 @@ test.describe('Theme', () => {
 // ============================================================
 // PUBLIC API
 // ============================================================
-test.describe('Public API (window.Annotate)', () => {
+test.describe('Public API (window.Annotate / window.MarkUS)', () => {
   test('exposes version', async ({ page }) => {
     const version = await page.evaluate(() => window.Annotate.version);
     expect(version).toBe('1.0.1');
+  });
+
+  test('exposes MarkUS as the canonical API alias', async ({ page }) => {
+    const apiShape = await page.evaluate(() => ({
+      sameObject: window.MarkUS === window.Annotate,
+      markusVersion: window.MarkUS && window.MarkUS.version,
+      annotateVersion: window.Annotate && window.Annotate.version,
+    }));
+
+    expect(apiShape).toEqual({
+      sameObject: true,
+      markusVersion: '1.0.1',
+      annotateVersion: '1.0.1',
+    });
+  });
+
+  test('markus.js bootstraps the review UI and legacy Annotate alias', async ({ page }) => {
+    await page.route('**/markus-test.html', route => route.fulfill({
+      contentType: 'text/html',
+      body: `<!doctype html>
+        <html>
+          <head><title>MarkUS asset test</title></head>
+          <body>
+            <main><h1>MarkUS asset test</h1><p>Review this page.</p></main>
+            <script src="/markus.js" data-project="markus-asset-test" defer></script>
+          </body>
+        </html>`,
+    }));
+
+    await page.goto('/markus-test.html');
+    await page.waitForFunction(() => !!window.MarkUS && !!window.Annotate);
+
+    expect(await page.evaluate(() => window.MarkUS === window.Annotate)).toBe(true);
+    await expect(page.locator('#__an_launch')).toBeVisible();
+    await page.evaluate(() => window.MarkUS.open());
+    await expect(page.locator('#__an_panel')).toHaveClass(/an-open/);
+    await expectPanelInViewport(page);
   });
 
   test('open() / close() control the panel', async ({ page }) => {

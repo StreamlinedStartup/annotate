@@ -1,9 +1,9 @@
 /* =============================================================================
- * annotate.js — a drop-in visual review & annotation layer for any website.
+ * markus.js / annotate.js — a drop-in visual review & annotation layer.
  * Open-source edition · local-only · zero backend.
  *
  * Load with a single <script> tag:
- *   <script src="https://cdn.jsdelivr.net/npm/reviewjs/annotate.js" defer></script>
+ *   <script src="https://cdn.jsdelivr.net/npm/@markus/client/markus.js" defer></script>
  *
  * Comments are stored in the visitor's own browser (localStorage) and can be
  * exported to / imported from a portable JSON file — no server, no database,
@@ -20,7 +20,7 @@
  *   data-note      author's note to reviewers — what should be reviewed
  *   data-share-email  where reviewers send comments: an email address, or a
  *                     Slack / Hangout (chat) link
- * …or via `window.AnnotateConfig = { project, page, … }` before the script.
+ * …or via `window.MarkUSConfig = { project, page, … }` before the script.
  *
  * Tools: text highlight, rectangle, circle, pin, freehand ink and section
  * notes — each carries a threaded comment.
@@ -42,9 +42,9 @@
   // then a global window.AnnotateConfig object, then built-in defaults.
   // --------------------------------------------------------------------------
   var SCRIPT = document.currentScript ||
-    document.querySelector('script[src*="annotate"]');
+    document.querySelector('script[src*="markus"], script[src*="annotate"]');
   var scriptData = (SCRIPT && SCRIPT.dataset) || {};   // data-* attributes
-  var globalConfig = window.AnnotateConfig || {};       // window.AnnotateConfig
+  var globalConfig = window.MarkUSConfig || window.AnnotateConfig || {};
   var CFG = {
     project: scriptData.project || globalConfig.project || "",
     page: scriptData.page || globalConfig.page || location.pathname,
@@ -2241,7 +2241,7 @@
   }
 
   // public API — lets host pages and other scripts compose with the layer
-  window.Annotate = {
+  var api = {
     version: VERSION,
     config: CFG,
     open: function () { ensureEnabled(); openPanel(); },
@@ -2266,6 +2266,8 @@
       load();
     },
   };
+  window.MarkUS = api;
+  window.Annotate = api;
 
   if (document.readyState === "loading")
     document.addEventListener("DOMContentLoaded", boot);

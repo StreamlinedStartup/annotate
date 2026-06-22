@@ -28,7 +28,7 @@ module.exports = defineConfig({
     },
   ],
   webServer: {
-    command: 'npx serve . --listen 4200 --no-clipboard',
+    command: 'bunx serve . --listen 4200 --no-clipboard',
     url: 'http://localhost:4200',
     reuseExistingServer: true,
     timeout: 15000,
