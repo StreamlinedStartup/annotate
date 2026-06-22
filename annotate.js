@@ -324,11 +324,10 @@
   }
   function syncLivePatch(id, changes, updated) {
     if (updated.livePending) { saveLiveDraft(updated); return; }
-    liveRequest("PATCH", "/comments/" + encodeURIComponent(id), {
+    liveRequest("PATCH", "/comments/" + encodeURIComponent(id), Object.assign({
       reviewId: CFG.reviewId,
       page: PAGE,
-      changes: changes,
-    }).then(function (data) {
+    }, changes)).then(function (data) {
       mergeComment(normalizeComment(data.comment || data || updated));
       state.liveStatus = "online";
       renderAll();

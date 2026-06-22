@@ -226,6 +226,12 @@ function markusPublicApi(e) {
       throw new NotFoundError("Comment not found.");
     }
 
+    comment.set("text", "[deleted]");
+    comment.set("pageUrl", "");
+    comment.set("color", "");
+    comment.set("anchor", null);
+    comment.set("geometry", null);
+    comment.set("clientId", "");
     comment.set("deleted", true);
     e.app.save(comment);
     return e.json(200, { "deletedId": comment.id });

@@ -1,5 +1,7 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
+const path = require('path');
 
 // Helper: enter review mode and dismiss the "Please provide your name" modal.
 // Startup now shows the review bubble; clicking it opens the name modal the
@@ -1062,6 +1064,54 @@ test.describe('Live MarkUS mode', () => {
     await expect(page.locator('#__an_foot')).toContainText('Offline draft');
   });
 
+  test('persists live resolve updates through the scoped live API', async ({ page }) => {
+    await routeLivePage(page);
+    let patchPayload;
+    let resolved = false;
+    const thread = () => ({
+      id: 'srv_resolve_comment',
+      pageKey: 'live-markus:/live-markus',
+      pageUrl: 'http://127.0.0.1/live-markus',
+      annotationType: 'pin',
+      author: 'Live Reviewer',
+      text: 'Resolve me remotely',
+      color: '#f59e0b',
+      geometry: { kind: 'pin', selector: 'body', x: 0.4, y: 0.2 },
+      resolved,
+      replies: [],
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+    });
+    await page.route('**/api/markus/v1/reviews/launch-homepage-v3/comments**', async route => {
+      const req = route.request();
+      if (req.method() === 'GET') {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ threads: [thread()] }),
+        });
+        return;
+      }
+      expect(req.method()).toBe('PATCH');
+      expect(req.url()).toContain('/comments/srv_resolve_comment');
+      patchPayload = req.postDataJSON();
+      expect(patchPayload.resolved).toBe(true);
+      expect(patchPayload.changes).toBeUndefined();
+      resolved = true;
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ comment: thread() }),
+      });
+    });
+
+    await page.goto('/live-markus.html');
+    await expect(page.locator('.an-card[data-id="srv_resolve_comment"]')).toBeVisible();
+    await page.locator('.an-card[data-id="srv_resolve_comment"] .an-mini', { hasText: 'Resolve' }).click();
+    await expect.poll(() => patchPayload, { timeout: 3000 }).toBeTruthy();
+    await expect(page.locator('.an-card[data-id="srv_resolve_comment"]')).toHaveCount(0);
+    await page.locator('.an-chip', { hasText: 'Resolved' }).click();
+    await expect(page.locator('.an-card[data-id="srv_resolve_comment"]')).toContainText('Resolved');
+  });
+
   test('persists live comment deletion after the undo window expires', async ({ page }) => {
     await routeLivePage(page);
     let deleteSeen = false;
@@ -1106,6 +1156,16 @@ test.describe('Live MarkUS mode', () => {
     await expect(page.locator('.an-card[data-id="srv_delete_comment"]')).toHaveCount(0);
     await expect.poll(() => deleteSeen, { timeout: 7000 }).toBe(true);
   });
+});
+
+test('PocketBase realtime comment rule allows soft-delete update events', () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, '..', 'markus-service', 'pb_migrations', '1782259200_markus_realtime_deleted_events.js'),
+    'utf8'
+  );
+
+  expect(migration).toContain('session.publicKey = @request.query.publicKey && pageKey = @request.query.pageKey');
+  expect(migration).not.toContain('&& deleted = false');
 });
 
 // ============================================================
