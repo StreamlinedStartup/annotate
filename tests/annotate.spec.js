@@ -423,16 +423,20 @@ test.describe('Comment actions', () => {
     await card.hover();
     await card.locator('.an-mini', { hasText: 'Reply' }).click();
     const replyInput = card.locator('.an-replybox .an-ta');
-    await replyInput.fill('Use this answer');
+    await replyInput.fill('Use this answer because it has enough text to wrap on the reply row.');
     await card.locator('.an-replybox .an-primary').click();
 
     const reply = card.locator('.an-reply').first();
     await reply.locator('.an-mini', { hasText: 'Mark solution' }).click();
 
     await expect(reply.locator('.an-sbadge')).toContainText('Solution');
+    const unmarkButton = reply.locator('.an-mini', { hasText: 'Unmark solution' });
+    await expect(unmarkButton).toHaveClass(/an-solution-on/);
+    const unmarkBox = await unmarkButton.boundingBox();
+    expect(unmarkBox.height).toBeLessThanOrEqual(34);
     await page.locator('.an-chip', { hasText: 'Solutions' }).click();
     await expect(page.locator('.an-card')).toHaveCount(1);
-    await expect(page.locator('.an-card')).toContainText('Use this answer');
+    await expect(page.locator('.an-card')).toContainText('Use this answer because it has enough text');
   });
 
   test('delete with undo', async ({ page }) => {

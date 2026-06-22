@@ -719,6 +719,9 @@
     transition: all .15s; }
   .an-mini svg { width:12px; height:12px; }
   .an-mini:hover { background: var(--an-surface-2); color: var(--an-fg); }
+  .an-mini.an-solution-on { background: rgba(109,40,217,.08); border-color: rgba(109,40,217,.35);
+    color: var(--an-btn-bg); font-weight:600; }
+  .an-mini.an-solution-on:hover { background: rgba(109,40,217,.13); color: var(--an-btn-bg); }
   .an-mini.an-danger:hover { background:rgba(225,29,72,.08); color: var(--an-danger);
     border-color: rgba(225,29,72,.3); }
   .an-replybox, .an-editbox { display:none; margin-top:8px; gap:6px; flex-direction:column; }
@@ -2040,8 +2043,8 @@
             avatarEl(r.author, 18),
             replyText,
           ]);
-          var rAct = el("span", { style: "display:flex;gap:4px;flex:none;margin-left:6px;flex-wrap:wrap" });
-          var rSolution = el("button", { class: "an-mini", html: ICONS.check + "<span>" + (r.solution ? "Unmark solution" : "Mark solution") + "</span>" });
+          var rAct = el("span", { style: "display:flex;gap:4px;flex:none;margin-left:6px;flex-wrap:wrap;align-items:flex-start" });
+          var rSolution = el("button", { class: "an-mini" + (r.solution ? " an-solution-on" : ""), html: ICONS.check + "<span>" + (r.solution ? "Unmark solution" : "Mark solution") + "</span>" });
           rSolution.addEventListener("click", function (e) {
             e.stopPropagation();
             var updated = patchComment(c.id, { solutionReply: { id: r.id, solution: !r.solution } });
@@ -2106,7 +2109,7 @@
           var updated = patchComment(c.id, { resolved: !c.resolved });
           if (updated) { mergeComment(updated); renderAll(); renderPanel(); }
         } }),
-        el("button", { class: "an-mini", html: ICONS.check + "<span>" + (c.solution ? "Unmark solution" : "Mark solution") + "</span>", onclick: function (e) {
+        el("button", { class: "an-mini" + (c.solution ? " an-solution-on" : ""), html: ICONS.check + "<span>" + (c.solution ? "Unmark solution" : "Mark solution") + "</span>", onclick: function (e) {
           e.stopPropagation();
           var updated = patchComment(c.id, { solution: !c.solution });
           if (updated) { mergeComment(updated); renderPanel(); }
