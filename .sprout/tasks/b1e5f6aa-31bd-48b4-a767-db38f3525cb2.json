@@ -1,0 +1,71 @@
+{
+  "id": "b1e5f6aa-31bd-48b4-a767-db38f3525cb2",
+  "revision": 6,
+  "title": "Document MarkUS public key setup",
+  "description": "Explain how MarkUS review sessions get public keys, how to generate and seed them, and what embed attributes must match the PocketBase origin/session configuration.",
+  "status": "done",
+  "priority": "high",
+  "created_at": "2026-06-22T01:19:59-07:00",
+  "updated_at": "2026-06-22T01:21:34-07:00",
+  "git_branch": "sprout/b1e5f6aa",
+  "affected_files": [
+    {
+      "path": "README.md",
+      "reason": "document embed public key setup and generation"
+    },
+    {
+      "path": "markus-service/README.md",
+      "reason": "document PocketBase session/origin seeding and key generation"
+    }
+  ],
+  "verify_command": "sprout doctor \u0026\u0026 rg -n \"public key|publicKey|data-public-key|review_origins|review_sessions|openssl rand\" README.md markus-service/README.md",
+  "consecutive_failures": 0,
+  "agent_notes": [
+    {
+      "timestamp": "2026-06-22T01:21:34-07:00",
+      "author": "agent",
+      "kind": "decision",
+      "content": "Documented public review keys as operator-generated browser-visible scoped capabilities, paired with enabled review_sessions and exact review_origins records."
+    }
+  ],
+  "events": [
+    {
+      "timestamp": "2026-06-22T01:19:59-07:00",
+      "kind": "created",
+      "description": "Task created"
+    },
+    {
+      "timestamp": "2026-06-22T01:20:04-07:00",
+      "kind": "started",
+      "description": "Task started",
+      "metadata": {
+        "agent": "codex"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T01:21:28-07:00",
+      "kind": "verified",
+      "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-22T01:21:34-07:00",
+      "kind": "note_added",
+      "description": "Agent note added",
+      "metadata": {
+        "author": "agent",
+        "kind": "decision"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T01:21:34-07:00",
+      "kind": "updated",
+      "description": "Task updated"
+    },
+    {
+      "timestamp": "2026-06-22T01:21:34-07:00",
+      "kind": "released",
+      "description": "Task lease released"
+    }
+  ],
+  "summary": "Documented public key generation, review session setup, allowed origins, embed matching, and key rotation."
+}
