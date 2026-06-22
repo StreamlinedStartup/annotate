@@ -1,0 +1,61 @@
+{
+  "id": "6f35c62d-4ff5-4ab5-9595-ac3738580e86",
+  "revision": 3,
+  "title": "Streamline MarkUS review session creation",
+  "description": "Add a protected setup form and bearer-token API for creating review_sessions and review_origins without manual database access.",
+  "status": "in-progress",
+  "priority": "high",
+  "created_at": "2026-06-22T09:45:28-07:00",
+  "updated_at": "2026-06-22T09:54:52-07:00",
+  "git_branch": "sprout/6f35c62d",
+  "affected_files": [
+    {
+      "path": "markus-service/pb_hooks/markus_public_api.pb.js",
+      "reason": "setup form and API routes"
+    },
+    {
+      "path": "markus-service/README.md",
+      "reason": "document streamlined setup flow"
+    },
+    {
+      "path": "docker-compose.yml",
+      "reason": "wire setup token environment variable"
+    }
+  ],
+  "consecutive_failures": 0,
+  "claimed_by": "codex",
+  "claimed_at": "2026-06-22T09:45:35-07:00",
+  "lease_expires_at": "2026-06-22T11:15:35-07:00",
+  "agent_notes": [
+    {
+      "timestamp": "2026-06-22T09:54:52-07:00",
+      "author": "agent",
+      "kind": "decision",
+      "content": "MarkUS review setup keeps review_sessions/review_origins as the source of truth and adds a token-protected setup form/API that writes those records through PocketBase hooks; direct collection rules remain closed."
+    }
+  ],
+  "events": [
+    {
+      "timestamp": "2026-06-22T09:45:28-07:00",
+      "kind": "created",
+      "description": "Task created"
+    },
+    {
+      "timestamp": "2026-06-22T09:45:35-07:00",
+      "kind": "started",
+      "description": "Task started",
+      "metadata": {
+        "agent": "codex"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T09:54:52-07:00",
+      "kind": "note_added",
+      "description": "Agent note added",
+      "metadata": {
+        "author": "agent",
+        "kind": "decision"
+      }
+    }
+  ]
+}

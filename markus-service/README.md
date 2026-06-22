@@ -8,6 +8,7 @@ This directory contains the v1 self-hosted MarkUS service scaffold. It uses Pock
 PB_ADMIN_EMAIL=admin@example.com \
 PB_ADMIN_PASSWORD=change-me-now \
 PB_ENCRYPTION="$(openssl rand -hex 16)" \
+MARKUS_SETUP_TOKEN="$(openssl rand -hex 24)" \
 docker compose up markus-pocketbase
 ```
 
@@ -40,8 +41,64 @@ All direct collection rules are closed to public users. Public visitor access go
 
 ## Seed a Review Session
 
-PocketBase does not generate MarkUS public review keys automatically. Generate
-one when you create a review session, store it in `review_sessions.publicKey`,
+Use the MarkUS setup page when you need a new review session:
+
+```text
+https://reviews.example.com/markus/setup
+```
+
+For local Compose runs, use the host and port printed by:
+
+```bash
+docker compose port markus-pocketbase 8090
+```
+
+The setup page can be opened without credentials, but creating a review requires
+the `MARKUS_SETUP_TOKEN`. The page sends that value as a bearer token only for
+the create request; it does not store the token, put it in the URL, or include
+it in generated output.
+
+Fill in:
+
+- `Setup token`: the operator-issued `MARKUS_SETUP_TOKEN`.
+- `Review name`: human label, for example `Launch homepage v3`.
+- `Project`: optional grouping label.
+- `Review ID`: optional slug. Leave blank to generate one from the name.
+- `Page URL or origins`: one full URL or exact origin per line. Full URLs are
+  converted to exact browser origins.
+- `Page key`: usually `/` or the path being reviewed.
+
+The result shows:
+
+- the `reviewId` / session slug,
+- the generated browser-visible `publicKey`,
+- the exact allowed origins,
+- a copyable `<script>` tag,
+- a test link for the first origin and page key.
+
+The generated script tag uses `MARKUS_SCRIPT_URL` for `src` and
+`MARKUS_PUBLIC_BASE_URL` for `data-api-base-url`.
+
+Automated setup can call the same endpoint:
+
+```bash
+curl -sS https://reviews.example.com/api/markus/setup/reviews \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $MARKUS_SETUP_TOKEN" \
+  --data '{
+    "name": "Launch homepage v3",
+    "project": "Hartford",
+    "origins": ["https://staging.example.com"],
+    "pageKey": "/",
+    "allowScreenshots": false,
+    "stripQuery": true,
+    "retentionDays": 0
+  }'
+```
+
+Manual database setup remains available as an operator fallback. PocketBase does
+not generate MarkUS public review keys from the admin UI, so generate one when
+you manually create a review session, store it in `review_sessions.publicKey`,
 and put the same value in the browser embed as `data-public-key`.
 
 ```bash
@@ -54,7 +111,8 @@ important part. Public review keys are browser-visible scoped capabilities, not
 admin secrets. Do not reuse PocketBase admin credentials, API tokens, passwords,
 or a `PB_ENCRYPTION` value as a public key.
 
-Create a session and origin from the PocketBase admin UI:
+Create a session and origin from the PocketBase admin UI only when you need the
+manual fallback:
 
 1. Add `review_sessions` record:
    - `slug`: `launch-homepage-v3`
