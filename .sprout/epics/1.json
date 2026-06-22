@@ -1,0 +1,17 @@
+{
+  "number": 1,
+  "title": "MarkUS live shared review",
+  "slug": "markus-live-shared-review",
+  "status": "todo",
+  "git_branch": "epic/1-markus-live-shared-review",
+  "created_at": "2026-06-21T22:50:24-07:00",
+  "updated_at": "2026-06-21T22:50:24-07:00",
+  "summary": "Rename the annotation layer to MarkUS and add the first self-hosted live review path with PocketBase-backed storage, realtime-ready client behavior, deployment scaffolding, documentation, and browser-reviewed UI.",
+  "events": [
+    {
+      "timestamp": "2026-06-21T22:50:24-07:00",
+      "kind": "created",
+      "description": "Epic created"
+    }
+  ]
+}

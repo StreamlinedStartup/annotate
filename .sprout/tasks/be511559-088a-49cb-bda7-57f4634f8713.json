@@ -1,0 +1,58 @@
+{
+  "id": "be511559-088a-49cb-bda7-57f4634f8713",
+  "revision": 2,
+  "title": "Rename browser client surface to MarkUS",
+  "description": "Introduce the MarkUS product surface while preserving backwards compatibility for existing Annotate embeds. Add the markus.js browser asset/global, package metadata changes, and focused tests that prove legacy Annotate usage still works.",
+  "status": "todo",
+  "priority": "high",
+  "epic_number": 1,
+  "created_at": "2026-06-21T22:52:27-07:00",
+  "updated_at": "2026-06-21T22:53:09-07:00",
+  "git_branch": "epic/1-markus-live-shared-review",
+  "affected_files": [
+    {
+      "path": "package.json",
+      "reason": "package metadata and publish entrypoints for MarkUS client"
+    },
+    {
+      "path": "annotate.js",
+      "reason": "existing browser client compatibility surface"
+    },
+    {
+      "path": "markus.js",
+      "reason": "new public MarkUS browser asset"
+    },
+    {
+      "path": "tests/annotate.spec.js",
+      "reason": "browser compatibility and naming coverage"
+    }
+  ],
+  "verify_command": "bunx playwright test --project=chromium tests/annotate.spec.js",
+  "consecutive_failures": 0,
+  "events": [
+    {
+      "timestamp": "2026-06-21T22:52:27-07:00",
+      "kind": "created",
+      "description": "Task created"
+    },
+    {
+      "timestamp": "2026-06-21T22:52:27-07:00",
+      "kind": "assigned_to_epic",
+      "description": "Task assigned to epic",
+      "metadata": {
+        "epic": "1"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T22:53:09-07:00",
+      "kind": "updated",
+      "description": "Task updated"
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "351a7d94-6121-4aa0-923c-6005a6b64324",
+      "type": "blocks_start"
+    }
+  ]
+}

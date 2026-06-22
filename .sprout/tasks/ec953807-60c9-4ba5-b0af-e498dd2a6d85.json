@@ -1,0 +1,58 @@
+{
+  "id": "ec953807-60c9-4ba5-b0af-e498dd2a6d85",
+  "revision": 2,
+  "title": "Scaffold self-hosted PocketBase service",
+  "description": "Add the v1 MarkUS PocketBase service scaffold with collections/migrations, public review endpoint hooks, scoped origin/public-key validation, rate-limit and sanitization placeholders, Docker Compose deployment, and service-level verification.",
+  "status": "todo",
+  "priority": "medium",
+  "epic_number": 1,
+  "created_at": "2026-06-21T22:52:43-07:00",
+  "updated_at": "2026-06-21T22:53:09-07:00",
+  "git_branch": "epic/1-markus-live-shared-review",
+  "affected_files": [
+    {
+      "path": "docker-compose.yml",
+      "reason": "self-hosted MarkUS and optional reverse proxy deployment"
+    },
+    {
+      "path": "markus-service/pb_migrations",
+      "reason": "PocketBase collection schema migrations"
+    },
+    {
+      "path": "markus-service/pb_hooks",
+      "reason": "PocketBase hooks for scoped public review APIs"
+    },
+    {
+      "path": "markus-service/README.md",
+      "reason": "service-specific setup and verification notes"
+    }
+  ],
+  "verify_command": "docker compose config \u0026\u0026 sprout doctor",
+  "consecutive_failures": 0,
+  "events": [
+    {
+      "timestamp": "2026-06-21T22:52:43-07:00",
+      "kind": "created",
+      "description": "Task created"
+    },
+    {
+      "timestamp": "2026-06-21T22:52:43-07:00",
+      "kind": "assigned_to_epic",
+      "description": "Task assigned to epic",
+      "metadata": {
+        "epic": "1"
+      }
+    },
+    {
+      "timestamp": "2026-06-21T22:53:09-07:00",
+      "kind": "updated",
+      "description": "Task updated"
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "351a7d94-6121-4aa0-923c-6005a6b64324",
+      "type": "blocks_start"
+    }
+  ]
+}
