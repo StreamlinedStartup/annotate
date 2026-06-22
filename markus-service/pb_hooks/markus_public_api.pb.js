@@ -248,7 +248,13 @@ function markusPublicApi(e) {
     var scope = requireSession(reviewId);
     var targetType = cleanText(body.targetType, 16);
     var targetId = cleanText(body.targetId, 32);
-    var enabled = body.enabled !== false;
+    var enabled = body.enabled;
+    if (enabled === "true") {
+      enabled = true;
+    } else if (enabled === "false") {
+      enabled = false;
+    }
+    enabled = enabled !== false;
     var comment;
     var replyId = "";
 

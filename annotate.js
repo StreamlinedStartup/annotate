@@ -202,6 +202,16 @@
   function normalizeComment(c) {
     c = c || {};
     var copy = Object.assign({}, c);
+    var solutionRecords = Array.isArray(copy.solutions)
+      ? copy.solutions.filter(function (s) { return s && !s.deleted; })
+      : [];
+    function solutionTargets(targetType, targetId) {
+      return solutionRecords.some(function (s) {
+        var recordType = s.targetType || (s.reply ? "reply" : "comment");
+        var recordTarget = s.targetId || s.reply || s.comment;
+        return recordType === targetType && recordTarget === targetId;
+      });
+    }
     copy.id = copy.id || uid();
     copy.page = copy.page || copy.pageKey || PAGE;
     copy.url = copy.url || copy.pageUrl || sanitizedUrl();
@@ -212,7 +222,7 @@
     copy.anchor = copy.anchor || null;
     copy.geom = copy.geom || copy.geometry || null;
     copy.resolved = !!copy.resolved;
-    copy.solution = !!copy.solution;
+    copy.solution = !!copy.solution || solutionTargets("comment", copy.id);
     if (!Array.isArray(copy.replies)) copy.replies = [];
     copy.replies = copy.replies.map(function (r) {
       r = r || {};
@@ -220,7 +230,7 @@
         id: r.id || uid(),
         author: r.author || "Anonymous",
         text: String(r.text || "").slice(0, 5000),
-        solution: !!r.solution,
+        solution: !!r.solution || solutionTargets("reply", r.id),
         createdAt: r.createdAt || r.created || new Date().toISOString(),
       };
     });
@@ -294,6 +304,30 @@
     if (changes.reply || changes.editReply || changes.solutionReply || changes.deleteReply) comment.replies = updated.replies;
     return comment;
   }
+  function livePatchOverrideConfirmed(comment, override) {
+    if (!override) return true;
+    var changes = override.changes || {};
+    var updated = override.updated || comment;
+    if (typeof changes.text === "string" && comment.text !== updated.text) return false;
+    if (typeof changes.resolved === "boolean" && comment.resolved !== updated.resolved) return false;
+    if (typeof changes.solution === "boolean" && comment.solution !== updated.solution) return false;
+    if (typeof changes.color === "string" && comment.color !== updated.color) return false;
+    if (changes.reply) {
+      if (!(comment.replies || []).some(function (r) { return r.id === changes.reply.id; })) return false;
+    }
+    if (changes.editReply) {
+      var edited = (comment.replies || []).filter(function (r) { return r.id === changes.editReply.id; })[0];
+      if (!edited || edited.text !== changes.editReply.text) return false;
+    }
+    if (changes.solutionReply) {
+      var solutionReply = (comment.replies || []).filter(function (r) { return r.id === changes.solutionReply.id; })[0];
+      if (!solutionReply || solutionReply.solution !== !!changes.solutionReply.solution) return false;
+    }
+    if (changes.deleteReply) {
+      if ((comment.replies || []).some(function (r) { return r.id === changes.deleteReply; })) return false;
+    }
+    return true;
+  }
   function syncLiveList(options) {
     if (!CFG.live.enabled) return;
     if (liveSyncInFlight) return;
@@ -305,7 +339,11 @@
       var incoming = Array.isArray(data) ? data : (data.threads || data.comments || []);
       state.comments = mergeLiveDrafts(incoming.map(function (comment) {
         var normalized = normalizeComment(comment);
-        return applyLivePatchOverride(normalized, livePatchOverrides[normalized.id]);
+        var override = livePatchOverrides[normalized.id];
+        var confirmed = livePatchOverrideConfirmed(normalized, override);
+        var merged = applyLivePatchOverride(normalized, override);
+        if (confirmed) delete livePatchOverrides[normalized.id];
+        return merged;
       }))
         .filter(function (c) { return !pendingDeletes[c.id]; });
       state.liveStatus = "online";
@@ -344,9 +382,39 @@
       reviewId: CFG.reviewId,
       page: PAGE,
     }, changes)).then(function (data) {
+      var override = livePatchOverrides[id];
       var saved = normalizeComment(data.comment || data || updated);
-      saved = applyLivePatchOverride(saved, livePatchOverrides[id]);
+      var confirmed = livePatchOverrideConfirmed(saved, override);
+      saved = applyLivePatchOverride(saved, override);
+      if (confirmed) delete livePatchOverrides[id];
+      mergeComment(saved);
+      state.liveStatus = "online";
+      renderAll();
+      renderPanel();
+    }).catch(function () {
       delete livePatchOverrides[id];
+      updated.livePending = true;
+      updated.liveError = "offline";
+      saveLiveDraft(updated);
+      state.liveStatus = "offline";
+      renderPanel();
+    });
+  }
+  function syncLiveSolution(id, targetType, targetId, enabled, updated, changes) {
+    if (updated.livePending) { saveLiveDraft(updated); return; }
+    livePatchOverrides[id] = { changes: changes, updated: updated };
+    liveRequest("POST", "/solutions", {
+      targetType: targetType,
+      targetId: targetId,
+      enabled: enabled,
+      actor: state.author || "Anonymous",
+      author: state.author || "Anonymous",
+    }).then(function (data) {
+      var override = livePatchOverrides[id];
+      var saved = normalizeComment(data.thread || data.comment || updated);
+      var confirmed = livePatchOverrideConfirmed(saved, override);
+      saved = applyLivePatchOverride(saved, override);
+      if (confirmed) delete livePatchOverrides[id];
       mergeComment(saved);
       state.liveStatus = "online";
       renderAll();
@@ -466,6 +534,14 @@
       if (changes.deleteReply) liveComment.replies = liveComment.replies.filter(function (r) { return r.id !== changes.deleteReply; });
       liveComment.updatedAt = new Date().toISOString();
       if (liveComment.livePending) saveLiveDraft(liveComment);
+      if (typeof changes.solution === "boolean" && Object.keys(changes).length === 1) {
+        syncLiveSolution(id, "comment", id, changes.solution, liveComment, changes);
+        return liveComment;
+      }
+      if (changes.solutionReply && Object.keys(changes).length === 1) {
+        syncLiveSolution(id, "reply", changes.solutionReply.id, !!changes.solutionReply.solution, liveComment, changes);
+        return liveComment;
+      }
       syncLivePatch(id, changes, liveComment);
       return liveComment;
     }

@@ -1117,6 +1117,189 @@ test.describe('Live MarkUS mode', () => {
     await expect(page.locator('.an-card[data-id="srv_resolve_comment"]')).toContainText('Resolved');
   });
 
+  test('marks live comment solutions through the solutions API and keeps the badge through stale refreshes', async ({ page }) => {
+    await routeLivePage(page);
+    let solutionPayload;
+    let commentPatchSeen = false;
+    const thread = () => ({
+      id: 'srv_solution_comment',
+      pageKey: 'live-markus:/live-markus',
+      pageUrl: 'http://127.0.0.1/live-markus',
+      annotationType: 'pin',
+      author: 'Live Reviewer',
+      text: 'Promote me to a solution',
+      color: '#f59e0b',
+      geometry: { kind: 'pin', selector: 'body', x: 0.4, y: 0.2 },
+      resolved: false,
+      solution: false,
+      replies: [],
+      solutions: [],
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+    });
+    await page.route('**/api/markus/v1/reviews/launch-homepage-v3/comments**', async route => {
+      const req = route.request();
+      if (req.method() === 'GET') {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ threads: [thread()] }),
+        });
+        return;
+      }
+      if (req.method() === 'PATCH') {
+        commentPatchSeen = true;
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ comment: thread() }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await page.route('**/api/markus/v1/reviews/launch-homepage-v3/solutions', async route => {
+      const req = route.request();
+      expect(req.method()).toBe('POST');
+      solutionPayload = req.postDataJSON();
+      expect(solutionPayload.targetType).toBe('comment');
+      expect(solutionPayload.targetId).toBe('srv_solution_comment');
+      expect(solutionPayload.enabled).toBe(true);
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          solution: {
+            id: 'srv_solution_marker',
+            comment: 'srv_solution_comment',
+            targetType: 'comment',
+            targetId: 'srv_solution_comment',
+            actor: solutionPayload.actor,
+            deleted: false,
+          },
+          thread: thread(),
+        }),
+      });
+    });
+
+    await page.goto('/live-markus.html');
+    await expect(page.locator('.an-card[data-id="srv_solution_comment"]')).toBeVisible();
+    const solutionResponse = page.waitForResponse(res =>
+      res.request().method() === 'POST' && res.url().includes('/solutions')
+    );
+    await page.evaluate(() => {
+      Array.from(document.querySelectorAll('.an-card[data-id="srv_solution_comment"] .an-mini'))
+        .find(button => button.textContent.includes('Mark solution'))
+        .click();
+    });
+    await solutionResponse;
+    await expect.poll(() => solutionPayload, { timeout: 3000 }).toBeTruthy();
+    expect(commentPatchSeen).toBe(false);
+
+    const staleRefresh = page.waitForResponse(res =>
+      res.request().method() === 'GET' && res.url().includes('/comments?pageKey=')
+    );
+    await page.evaluate(() => window.MarkUS.refresh());
+    await staleRefresh;
+    await page.evaluate(() => document.querySelector('.an-chip[data-f="solutions"]').click());
+    const card = page.locator('.an-card[data-id="srv_solution_comment"]');
+    await expect(card).toBeVisible();
+    await expect(card.locator('.an-sbadge')).toContainText('Solution');
+  });
+
+  test('marks live reply solutions through the solutions API and keeps the thread under Solutions', async ({ page }) => {
+    await routeLivePage(page);
+    let solutionPayload;
+    let commentPatchSeen = false;
+    const thread = () => ({
+      id: 'srv_reply_solution_comment',
+      pageKey: 'live-markus:/live-markus',
+      pageUrl: 'http://127.0.0.1/live-markus',
+      annotationType: 'pin',
+      author: 'Live Reviewer',
+      text: 'Thread with a reply answer',
+      color: '#f59e0b',
+      geometry: { kind: 'pin', selector: 'body', x: 0.4, y: 0.2 },
+      resolved: false,
+      solution: false,
+      replies: [{
+        id: 'srv_reply_solution',
+        comment: 'srv_reply_solution_comment',
+        author: 'Live Reviewer',
+        text: 'This reply solves it',
+        solution: false,
+        created: new Date().toISOString(),
+      }],
+      solutions: [],
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+    });
+    await page.route('**/api/markus/v1/reviews/launch-homepage-v3/comments**', async route => {
+      const req = route.request();
+      if (req.method() === 'GET') {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ threads: [thread()] }),
+        });
+        return;
+      }
+      if (req.method() === 'PATCH') {
+        commentPatchSeen = true;
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ comment: thread() }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await page.route('**/api/markus/v1/reviews/launch-homepage-v3/solutions', async route => {
+      const req = route.request();
+      expect(req.method()).toBe('POST');
+      solutionPayload = req.postDataJSON();
+      expect(solutionPayload.targetType).toBe('reply');
+      expect(solutionPayload.targetId).toBe('srv_reply_solution');
+      expect(solutionPayload.enabled).toBe(true);
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          solution: {
+            id: 'srv_reply_solution_marker',
+            comment: 'srv_reply_solution_comment',
+            reply: 'srv_reply_solution',
+            targetType: 'reply',
+            targetId: 'srv_reply_solution',
+            actor: solutionPayload.actor,
+            deleted: false,
+          },
+          thread: thread(),
+        }),
+      });
+    });
+
+    await page.goto('/live-markus.html');
+    await expect(page.locator('.an-card[data-id="srv_reply_solution_comment"]')).toBeVisible();
+    const solutionResponse = page.waitForResponse(res =>
+      res.request().method() === 'POST' && res.url().includes('/solutions')
+    );
+    await page.evaluate(() => {
+      Array.from(document.querySelectorAll('.an-reply'))
+        .find(reply => reply.textContent.includes('This reply solves it'))
+        .querySelector('.an-mini')
+        .click();
+    });
+    await solutionResponse;
+    await expect.poll(() => solutionPayload, { timeout: 3000 }).toBeTruthy();
+    expect(commentPatchSeen).toBe(false);
+
+    const staleRefresh = page.waitForResponse(res =>
+      res.request().method() === 'GET' && res.url().includes('/comments?pageKey=')
+    );
+    await page.evaluate(() => window.MarkUS.refresh());
+    await staleRefresh;
+    await page.evaluate(() => document.querySelector('.an-chip[data-f="solutions"]').click());
+    const card = page.locator('.an-card[data-id="srv_reply_solution_comment"]');
+    await expect(card).toBeVisible();
+    await expect(card.locator('.an-reply', { hasText: 'This reply solves it' }).locator('.an-sbadge')).toContainText('Solution');
+  });
+
   test('persists live comment deletion after the undo window expires', async ({ page }) => {
     await routeLivePage(page);
     let deleteSeen = false;

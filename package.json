@@ -1,6 +1,6 @@
 {
   "name": "@vulture916/markus",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "MarkUS is a drop-in visual review and annotation layer for any website.",
   "main": "markus.js",
   "unpkg": "markus.js",
