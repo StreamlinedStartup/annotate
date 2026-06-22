@@ -359,12 +359,14 @@
       if (!livePollTimer) livePollTimer = setInterval(function () { syncLiveList({ quiet: true }); }, 2500);
       return;
     }
+    var topic = realtimeTopic();
     liveRealtime = new EventSource(realtimeUrl());
     liveRealtime.addEventListener("PB_CONNECT", function (ev) {
       var data;
       try { data = JSON.parse(ev.data || "{}"); } catch (e) { data = {}; }
-      if (!data.clientId) return;
-      subscribeRealtime(data.clientId).then(function () {
+      var clientId = data.clientId || ev.lastEventId || "";
+      if (!clientId) return;
+      subscribeRealtime(clientId).then(function () {
         state.liveStatus = "online";
         renderPanel();
       }).catch(function () {
@@ -380,6 +382,7 @@
     }
     liveRealtime.addEventListener("message", onRealtimeEvent);
     liveRealtime.addEventListener("review_comments/*", onRealtimeEvent);
+    liveRealtime.addEventListener(topic, onRealtimeEvent);
     liveRealtime.onerror = function () {
       state.liveStatus = liveDrafts().length ? "offline" : "unavailable";
       renderPanel();

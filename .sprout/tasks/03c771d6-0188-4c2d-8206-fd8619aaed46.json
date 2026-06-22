@@ -1,0 +1,92 @@
+{
+  "id": "03c771d6-0188-4c2d-8206-fd8619aaed46",
+  "revision": 5,
+  "title": "Fix MarkUS PocketBase realtime comment sync",
+  "description": "Debug and fix browser realtime subscriptions so PocketBase review_comments create/update/delete events refresh the live comment list across devices.",
+  "status": "in-progress",
+  "priority": "high",
+  "created_at": "2026-06-22T10:27:39-07:00",
+  "updated_at": "2026-06-22T10:30:15-07:00",
+  "git_branch": "sprout/03c771d6",
+  "affected_files": [
+    {
+      "path": "annotate.js",
+      "reason": "PocketBase realtime EventSource subscription and sync trigger"
+    },
+    {
+      "path": "tests/markus-live.spec.js",
+      "reason": "browser regression coverage for PocketBase SSE event names"
+    },
+    {
+      "path": "package.json",
+      "reason": "patch release version bump"
+    },
+    {
+      "path": "tests/annotate.spec.js",
+      "reason": "existing live Playwright tests are located here, including PocketBase realtime coverage"
+    },
+    {
+      "path": "package-lock.json",
+      "reason": "committed npm lock metadata contains package version and must match the 1.1.3 release"
+    }
+  ],
+  "doc_refs": [
+    {
+      "ref": "https://pocketbase.io/docs/api-realtime/",
+      "required": true
+    }
+  ],
+  "doc_reason": "PocketBase realtime SSE event names and subscription behavior must be verified against official docs",
+  "consecutive_failures": 0,
+  "claimed_by": "codex",
+  "claimed_at": "2026-06-22T10:27:42-07:00",
+  "lease_expires_at": "2026-06-22T12:27:42-07:00",
+  "agent_notes": [
+    {
+      "timestamp": "2026-06-22T10:30:15-07:00",
+      "author": "agent",
+      "kind": "decision",
+      "content": "PocketBase sends realtime record events on the exact subscription topic key registered with /api/realtime, including serialized options, and exposes the PB_CONNECT client id as lastEventId. MarkUS now listens to that exact topic while keeping message and bare collection fallbacks."
+    }
+  ],
+  "events": [
+    {
+      "timestamp": "2026-06-22T10:27:39-07:00",
+      "kind": "created",
+      "description": "Task created"
+    },
+    {
+      "timestamp": "2026-06-22T10:27:42-07:00",
+      "kind": "started",
+      "description": "Task started",
+      "metadata": {
+        "agent": "codex"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T10:28:17-07:00",
+      "kind": "scope_touched",
+      "description": "Affected file scope updated",
+      "metadata": {
+        "reason": "existing live Playwright tests are located here, including PocketBase realtime coverage"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T10:30:02-07:00",
+      "kind": "scope_touched",
+      "description": "Affected file scope updated",
+      "metadata": {
+        "reason": "committed npm lock metadata contains package version and must match the 1.1.3 release"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T10:30:15-07:00",
+      "kind": "note_added",
+      "description": "Agent note added",
+      "metadata": {
+        "author": "agent",
+        "kind": "decision"
+      }
+    }
+  ]
+}

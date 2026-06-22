@@ -950,8 +950,8 @@ test.describe('Live MarkUS mode', () => {
         close() {
           this.closed = true;
         }
-        dispatch(type, data) {
-          (this.listeners[type] || []).forEach(callback => callback({ data: JSON.stringify(data) }));
+        dispatch(type, data, lastEventId = '') {
+          (this.listeners[type] || []).forEach(callback => callback({ data: JSON.stringify(data), lastEventId }));
         }
       };
     });
@@ -993,16 +993,16 @@ test.describe('Live MarkUS mode', () => {
     const realtimeUrl = await page.evaluate(() => window.__markusEventSources[0].url);
     expect(realtimeUrl).toBe('http://localhost:4200/api/realtime');
     await page.evaluate(() => {
-      window.__markusEventSources[0].dispatch('PB_CONNECT', { clientId: 'client_1' });
+      window.__markusEventSources[0].dispatch('PB_CONNECT', {}, 'client_1');
     });
     await expect.poll(() => realtimeSubscription, { timeout: 3000 }).toBeTruthy();
     expect(realtimeSubscription.clientId).toBe('client_1');
     expect(realtimeSubscription.subscriptions[0]).toContain('review_comments/*');
     expect(decodeURIComponent(realtimeSubscription.subscriptions[0])).toContain('"pageKey":"live-markus:/live-markus"');
     expect(decodeURIComponent(realtimeSubscription.subscriptions[0])).toContain('"publicKey":"rvw_pub_test"');
-    await page.evaluate(() => {
-      window.__markusEventSources[0].dispatch('message', { action: 'create', record: { id: 'srv_realtime_comment' } });
-    });
+    await page.evaluate(topic => {
+      window.__markusEventSources[0].dispatch(topic, { action: 'create', record: { id: 'srv_realtime_comment' } });
+    }, realtimeSubscription.subscriptions[0]);
     await expect(page.locator('.an-card[data-id="srv_polled_comment"]')).toContainText('Appeared through realtime', { timeout: 3000 });
   });
 
