@@ -30,15 +30,29 @@ All direct collection rules are closed to public users. Public visitor access go
 
 ## Seed a Review Session
 
+PocketBase does not generate MarkUS public review keys automatically. Generate
+one when you create a review session, store it in `review_sessions.publicKey`,
+and put the same value in the browser embed as `data-public-key`.
+
+```bash
+MARKUS_PUBLIC_KEY="rvw_pub_$(openssl rand -hex 24)"
+printf '%s\n' "$MARKUS_PUBLIC_KEY"
+```
+
+The `rvw_pub_` prefix is a convention for readability; the random suffix is the
+important part. Public review keys are browser-visible scoped capabilities, not
+admin secrets. Do not reuse PocketBase admin credentials, API tokens, passwords,
+or a `PB_ENCRYPTION` value as a public key.
+
 Create a session and origin from the PocketBase admin UI:
 
 1. Add `review_sessions` record:
    - `slug`: `launch-homepage-v3`
-   - `publicKey`: `rvw_pub_local`
+   - `publicKey`: the generated `rvw_pub_...` value
    - `enabled`: `true`
 2. Add `review_origins` record:
    - `session`: the new session
-   - `origin`: `http://localhost:4200`
+   - `origin`: exact browser origin, for example `http://localhost:4200`
    - `enabled`: `true`
 
 Then embed the client with:
@@ -48,9 +62,21 @@ Then embed the client with:
   src="http://localhost:4200/markus.js"
   data-review-id="launch-homepage-v3"
   data-api-base-url="http://localhost:8090"
-  data-public-key="rvw_pub_local"
+  data-public-key="rvw_pub_..."
   defer></script>
 ```
+
+The browser sends that key as `X-Markus-Public-Key`. The hook accepts the
+request only when all of these match:
+
+- `{reviewId}` route segment equals an enabled `review_sessions.slug`.
+- `X-Markus-Public-Key` equals that session's `publicKey`.
+- The request `Origin` exactly matches an enabled `review_origins.origin` for
+  the same session.
+
+Use one public key per review session. To rotate access, replace
+`review_sessions.publicKey`, update every embed using that session, and disable
+or remove stale origins that should no longer post comments.
 
 ## Public API
 
@@ -74,7 +100,7 @@ Example comment request:
 curl -sS http://localhost:8090/api/markus/v1/reviews/launch-homepage-v3/comments \
   -H 'Content-Type: application/json' \
   -H 'Origin: http://localhost:4200' \
-  -H 'X-Markus-Public-Key: rvw_pub_local' \
+  -H 'X-Markus-Public-Key: rvw_pub_...' \
   --data '{"pageKey":"/","annotationType":"note","author":"Reviewer","text":"Tighten this heading."}'
 ```
 

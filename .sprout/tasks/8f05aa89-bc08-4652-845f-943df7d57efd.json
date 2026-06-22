@@ -1,0 +1,91 @@
+{
+  "id": "8f05aa89-bc08-4652-845f-943df7d57efd",
+  "revision": 7,
+  "title": "Fix localhost MarkUS PocketBase integration",
+  "description": "Align the browser live data layer with the self-hosted PocketBase hook routes so localhost can create and list comments against the Docker service.",
+  "status": "done",
+  "priority": "high",
+  "created_at": "2026-06-22T00:46:54-07:00",
+  "updated_at": "2026-06-22T01:05:15-07:00",
+  "git_branch": "sprout/8f05aa89",
+  "affected_files": [
+    {
+      "path": "annotate.js",
+      "reason": "align live route, list, and create payload with PocketBase hooks"
+    },
+    {
+      "path": "tests/annotate.spec.js",
+      "reason": "update live mode route expectations"
+    },
+    {
+      "path": "README.md",
+      "reason": "keep localhost embed guidance accurate"
+    },
+    {
+      "path": "markus-service/README.md",
+      "reason": "keep localhost smoke guidance accurate"
+    },
+    {
+      "path": "markus-service/pb_hooks/markus_public_api.pb.js",
+      "reason": "fix public response export so localhost PocketBase hook can list/create comments"
+    }
+  ],
+  "verify_command": "sprout doctor \u0026\u0026 bunx playwright test --project=chromium tests/annotate.spec.js",
+  "consecutive_failures": 0,
+  "agent_notes": [
+    {
+      "timestamp": "2026-06-22T01:04:25-07:00",
+      "author": "agent",
+      "kind": "decision",
+      "content": "Aligned the browser live data layer to the PocketBase hook contract. Browser localhost smoke uses a same-origin proxy because Chrome blocks direct cross-port loopback fetches from localhost:4200 to localhost:8090 with Private Network Access preflight rules."
+    }
+  ],
+  "events": [
+    {
+      "timestamp": "2026-06-22T00:46:54-07:00",
+      "kind": "created",
+      "description": "Task created"
+    },
+    {
+      "timestamp": "2026-06-22T00:47:07-07:00",
+      "kind": "started",
+      "description": "Task started",
+      "metadata": {
+        "agent": "codex"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T00:47:29-07:00",
+      "kind": "scope_touched",
+      "description": "Affected file scope updated",
+      "metadata": {
+        "reason": "fix public response export so localhost PocketBase hook can list/create comments"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T01:04:17-07:00",
+      "kind": "verified",
+      "description": "Verification passed"
+    },
+    {
+      "timestamp": "2026-06-22T01:04:25-07:00",
+      "kind": "note_added",
+      "description": "Agent note added",
+      "metadata": {
+        "author": "agent",
+        "kind": "decision"
+      }
+    },
+    {
+      "timestamp": "2026-06-22T01:05:15-07:00",
+      "kind": "updated",
+      "description": "Task updated"
+    },
+    {
+      "timestamp": "2026-06-22T01:05:15-07:00",
+      "kind": "released",
+      "description": "Task lease released"
+    }
+  ],
+  "summary": "Docker-backed localhost smoke passes after aligning the live client with the PocketBase public API contract."
+}

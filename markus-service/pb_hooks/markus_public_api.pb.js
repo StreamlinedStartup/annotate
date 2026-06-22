@@ -4,6 +4,7 @@ function markusPublicApi(e) {
     e.response.header().set("Access-Control-Allow-Origin", origin || "*");
     e.response.header().set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
     e.response.header().set("Access-Control-Allow-Headers", "Content-Type, X-Markus-Public-Key, Authorization");
+    e.response.header().set("Access-Control-Allow-Private-Network", "true");
     e.response.header().set("Access-Control-Max-Age", "600");
   }
 
@@ -60,10 +61,33 @@ function markusPublicApi(e) {
   }
 
   function exportRecord(record) {
-    var exported = record.publicExport();
-    delete exported.collectionId;
-    delete exported.collectionName;
-    return exported;
+    return {
+      "id": record.id,
+      "created": record.get("created"),
+      "updated": record.get("updated"),
+      "session": record.getString("session"),
+      "comment": record.getString("comment"),
+      "reply": record.getString("reply"),
+      "pageKey": record.getString("pageKey"),
+      "page": record.getString("pageKey"),
+      "pageUrl": record.getString("pageUrl"),
+      "url": record.getString("pageUrl"),
+      "origin": record.getString("origin"),
+      "annotationType": record.getString("annotationType"),
+      "type": record.getString("annotationType"),
+      "author": record.getString("author"),
+      "text": record.getString("text"),
+      "color": record.getString("color"),
+      "anchor": record.get("anchor") || null,
+      "geometry": record.get("geometry") || null,
+      "geom": record.get("geometry") || null,
+      "resolved": record.getBool("resolved"),
+      "deleted": record.getBool("deleted"),
+      "clientId": record.getString("clientId"),
+      "targetType": record.getString("targetType"),
+      "targetId": record.getString("targetId"),
+      "actor": record.getString("actor")
+    };
   }
 
   function exportThread(comment) {
@@ -74,7 +98,7 @@ function markusPublicApi(e) {
     var replies = e.app.findRecordsByFilter(
       "review_replies",
       "comment = {:comment} && deleted = false",
-      "created",
+      "id",
       100,
       0,
       { "comment": comment.id }
@@ -86,7 +110,7 @@ function markusPublicApi(e) {
     var solutions = e.app.findRecordsByFilter(
       "review_solutions",
       "comment = {:comment} && deleted = false",
-      "created",
+      "id",
       100,
       0,
       { "comment": comment.id }
@@ -103,7 +127,7 @@ function markusPublicApi(e) {
     var comments = e.app.findRecordsByFilter(
       "review_comments",
       "session = {:session} && pageKey = {:pageKey} && deleted = false",
-      "created",
+      "id",
       200,
       0,
       { "session": scope.session.id, "pageKey": pageKey }

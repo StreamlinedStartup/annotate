@@ -200,14 +200,14 @@
     c = c || {};
     var copy = Object.assign({}, c);
     copy.id = copy.id || uid();
-    copy.page = copy.page || PAGE;
-    copy.url = copy.url || sanitizedUrl();
-    copy.type = copy.type || "note";
+    copy.page = copy.page || copy.pageKey || PAGE;
+    copy.url = copy.url || copy.pageUrl || sanitizedUrl();
+    copy.type = copy.type || copy.annotationType || "note";
     copy.author = copy.author || "Anonymous";
     copy.text = String(copy.text || "").slice(0, 5000);
     copy.color = copy.color || state.color;
     copy.anchor = copy.anchor || null;
-    copy.geom = copy.geom || null;
+    copy.geom = copy.geom || copy.geometry || null;
     copy.resolved = !!copy.resolved;
     copy.solution = !!copy.solution;
     if (!Array.isArray(copy.replies)) copy.replies = [];
@@ -226,15 +226,20 @@
     return copy;
   }
   function liveCommentPayload(comment) {
-    var copy = JSON.parse(JSON.stringify(comment));
-    delete copy.livePending;
-    delete copy.liveError;
-    copy.page = PAGE;
-    copy.url = sanitizedUrl();
-    return copy;
+    return {
+      pageKey: PAGE,
+      pageUrl: sanitizedUrl(),
+      annotationType: comment.type || "note",
+      author: comment.author || "Anonymous",
+      text: comment.text || "",
+      color: comment.color || "",
+      anchor: comment.anchor || null,
+      geometry: comment.geom || null,
+      clientId: comment.id || "",
+    };
   }
   function liveUrl(path) {
-    return CFG.apiBaseUrl + "/api/reviews/" + encodeURIComponent(CFG.reviewId) + path;
+    return CFG.apiBaseUrl + "/api/markus/v1/reviews/" + encodeURIComponent(CFG.reviewId) + path;
   }
   function liveRequest(method, path, body) {
     var opts = {
@@ -255,13 +260,13 @@
     renderPanel();
   }
   function liveListPath() {
-    return "/comments?page=" + encodeURIComponent(PAGE);
+    return "/comments?pageKey=" + encodeURIComponent(PAGE);
   }
   function syncLiveList() {
     if (!CFG.live.enabled) return;
     setLiveStatus("connecting");
     liveRequest("GET", liveListPath()).then(function (data) {
-      var incoming = Array.isArray(data) ? data : (data.comments || []);
+      var incoming = Array.isArray(data) ? data : (data.threads || data.comments || []);
       state.comments = mergeLiveDrafts(incoming.map(normalizeComment));
       state.liveStatus = "online";
       renderAll();
@@ -274,12 +279,7 @@
     });
   }
   function syncLiveCreate(comment) {
-    liveRequest("POST", "/comments", {
-      reviewId: CFG.reviewId,
-      page: PAGE,
-      publicKey: CFG.publicKey,
-      comment: liveCommentPayload(comment),
-    }).then(function (data) {
+    liveRequest("POST", "/comments", liveCommentPayload(comment)).then(function (data) {
       var saved = normalizeComment(data.comment || data);
       removeLiveDraft(comment.id);
       state.comments = state.comments.filter(function (c) { return c.id !== comment.id; });

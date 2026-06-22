@@ -872,20 +872,21 @@ test.describe('Live MarkUS mode', () => {
 
   test('loads shared comments from the scoped live API', async ({ page }) => {
     await routeLivePage(page);
-    await page.route('**/api/reviews/launch-homepage-v3/comments**', route => {
+    await page.route('**/api/markus/v1/reviews/launch-homepage-v3/comments**', route => {
       expect(route.request().headers()['x-markus-public-key']).toBe('rvw_pub_test');
+      expect(route.request().url()).toContain('pageKey=live-markus%3A%2Flive-markus');
       route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
-          comments: [{
+          threads: [{
             id: 'srv_comment_1',
-            page: 'live-markus:/live-markus',
-            url: 'http://127.0.0.1/live-markus',
-            type: 'pin',
+            pageKey: 'live-markus:/live-markus',
+            pageUrl: 'http://127.0.0.1/live-markus',
+            annotationType: 'pin',
             author: 'Live Reviewer',
             text: 'Shared live comment',
             color: '#f59e0b',
-            geom: { kind: 'pin', selector: 'body', x: 0.4, y: 0.2 },
+            geometry: { kind: 'pin', selector: 'body', x: 0.4, y: 0.2 },
             resolved: false,
             replies: [],
             createdAt: new Date().toISOString(),
@@ -904,21 +905,23 @@ test.describe('Live MarkUS mode', () => {
 
   test('posts new comments to the live API and uses the saved record', async ({ page }) => {
     await routeLivePage(page);
-    await page.route('**/api/reviews/launch-homepage-v3/comments**', async route => {
+    await page.route('**/api/markus/v1/reviews/launch-homepage-v3/comments**', async route => {
       const req = route.request();
       if (req.method() === 'GET') {
-        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ comments: [] }) });
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ threads: [] }) });
         return;
       }
 
       expect(req.method()).toBe('POST');
       expect(req.headers()['x-markus-public-key']).toBe('rvw_pub_test');
       const payload = req.postDataJSON();
-      expect(payload.comment.text).toBe('Live pin saved');
+      expect(payload.text).toBe('Live pin saved');
+      expect(payload.pageKey).toBe('live-markus:/live-markus');
+      expect(payload.annotationType).toBe('pin');
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
-          comment: { ...payload.comment, id: 'srv_created_1', livePending: false },
+          comment: { ...payload, id: 'srv_created_1', livePending: false },
         }),
       });
     });
@@ -936,9 +939,9 @@ test.describe('Live MarkUS mode', () => {
 
   test('keeps failed live writes as explicit offline drafts', async ({ page }) => {
     await routeLivePage(page);
-    await page.route('**/api/reviews/launch-homepage-v3/comments**', async route => {
+    await page.route('**/api/markus/v1/reviews/launch-homepage-v3/comments**', async route => {
       if (route.request().method() === 'GET') {
-        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ comments: [] }) });
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ threads: [] }) });
         return;
       }
       await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'offline' }) });
