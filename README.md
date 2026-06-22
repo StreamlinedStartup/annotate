@@ -68,7 +68,7 @@ Add this before `</body>`:
 To pin a production version:
 
 ```html
-<script src="https://unpkg.com/@vulture916/markus@1.1.1/markus.js" defer></script>
+<script src="https://unpkg.com/@vulture916/markus@1.1.2/markus.js" defer></script>
 ```
 
 Self-host the client by copying [`markus.js`](./markus.js) or
