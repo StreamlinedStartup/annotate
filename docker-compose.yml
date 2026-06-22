@@ -4,11 +4,8 @@ services:
     container_name: markus-pocketbase
     restart: unless-stopped
     command:
-      - serve
-      - --http=0.0.0.0:8090
-      - --dir=/pb_data
-      - --hooksDir=/pb_hooks
       - --migrationsDir=/pb_migrations
+      - --encryptionEnv=ENCRYPTION
     environment:
       PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL:-}
       PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD:-}

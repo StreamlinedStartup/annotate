@@ -15,6 +15,11 @@ PocketBase listens on container port `8090`; Coolify can route that service
 port directly. For a local Compose run, inspect the published host port with
 `docker compose port markus-pocketbase 8090`.
 
+The Compose command intentionally passes only PocketBase flags. The pinned
+image entrypoint creates or updates the superuser from `PB_ADMIN_EMAIL` and
+`PB_ADMIN_PASSWORD` before serving, but only when the command is empty or starts
+with a flag.
+
 PocketBase does not publish an official Docker image. The Compose file pins the community `ghcr.io/muchobien/pocketbase:0.39.4` image and mounts committed migrations/hooks into the container.
 
 ## Collections
