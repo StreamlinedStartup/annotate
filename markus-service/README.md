@@ -11,7 +11,9 @@ PB_ENCRYPTION="$(openssl rand -hex 16)" \
 docker compose up markus-pocketbase
 ```
 
-PocketBase starts on `http://localhost:8090`. The admin dashboard is at `http://localhost:8090/_/`.
+PocketBase listens on container port `8090`; Coolify can route that service
+port directly. For a local Compose run, inspect the published host port with
+`docker compose port markus-pocketbase 8090`.
 
 PocketBase does not publish an official Docker image. The Compose file pins the community `ghcr.io/muchobien/pocketbase:0.39.4` image and mounts committed migrations/hooks into the container.
 
@@ -61,7 +63,7 @@ Then embed the client with:
 <script
   src="http://localhost:4200/markus.js"
   data-review-id="launch-homepage-v3"
-  data-api-base-url="http://localhost:8090"
+  data-api-base-url="https://reviews.example.com"
   data-public-key="rvw_pub_..."
   defer></script>
 ```
@@ -97,7 +99,7 @@ Endpoints:
 Example comment request:
 
 ```bash
-curl -sS http://localhost:8090/api/markus/v1/reviews/launch-homepage-v3/comments \
+curl -sS https://reviews.example.com/api/markus/v1/reviews/launch-homepage-v3/comments \
   -H 'Content-Type: application/json' \
   -H 'Origin: http://localhost:4200' \
   -H 'X-Markus-Public-Key: rvw_pub_...' \

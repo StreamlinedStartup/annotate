@@ -204,8 +204,9 @@ PB_ENCRYPTION="$(openssl rand -hex 16)" \
 docker compose up markus-pocketbase
 ```
 
-PocketBase starts at `http://localhost:8090`; the admin dashboard is at
-`http://localhost:8090/_/`.
+PocketBase listens on container port `8090`; Coolify can route that service
+port directly. For a local Compose run, inspect the published host port with
+`docker compose port markus-pocketbase 8090`.
 
 Create a review session in the PocketBase admin UI:
 
